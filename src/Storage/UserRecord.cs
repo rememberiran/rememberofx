@@ -1,6 +1,6 @@
-namespace Domain.Entities;
+namespace Storage;
 
-public class User
+public class UserRecord
 {
     public Guid Id { get; set; }
     public string XUserId { get; set; } = default!;
@@ -10,5 +10,5 @@ public class User
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public Guid? CreatedByUserId { get; set; }
 
-    public User? CreatedByUser { get; set; }
+    public UserRecord? CreatedByUser { get; set; }
 }

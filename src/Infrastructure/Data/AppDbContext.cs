@@ -1,4 +1,4 @@
-using Domain.Entities;
+using Storage;
 using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Data;
@@ -9,26 +9,28 @@ public class AppDbContext : DbContext
     {
     }
 
-    public DbSet<User> Users => Set<User>();
-    public DbSet<Tweet> Tweets => Set<Tweet>();
-    public DbSet<XUserProfile> XUserProfiles => Set<XUserProfile>();
-    public DbSet<Folder> Folders => Set<Folder>();
-    public DbSet<FolderTweet> FolderTweets => Set<FolderTweet>();
-    public DbSet<Vote> Votes => Set<Vote>();
-    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<UserRecord> Users => Set<UserRecord>();
+    public DbSet<TweetRecord> Tweets => Set<TweetRecord>();
+    public DbSet<XUserProfileRecord> XUserProfiles => Set<XUserProfileRecord>();
+    public DbSet<FolderRecord> Folders => Set<FolderRecord>();
+    public DbSet<FolderTweetRecord> FolderTweets => Set<FolderTweetRecord>();
+    public DbSet<VoteRecord> Votes => Set<VoteRecord>();
+    public DbSet<AuditLogRecord> AuditLogs => Set<AuditLogRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<User>(e =>
+        modelBuilder.Entity<UserRecord>(e =>
         {
+            e.ToTable("Users");
             e.HasIndex(u => u.XUserId).IsUnique();
             e.Property(u => u.XUserId).HasMaxLength(50);
             e.Property(u => u.XUsername).HasMaxLength(100);
             e.Property(u => u.Role).HasMaxLength(20);
         });
 
-        modelBuilder.Entity<Tweet>(e =>
+        modelBuilder.Entity<TweetRecord>(e =>
         {
+            e.ToTable("Tweets");
             e.HasIndex(t => t.XTweetId).IsUnique();
             e.HasIndex(t => t.AuthorXUserId);
             e.HasIndex(t => t.VoteCount).IsDescending();
@@ -41,11 +43,12 @@ public class AppDbContext : DbContext
             e.Property(t => t.ScreenshotBlobName).HasMaxLength(200);
             e.Property(t => t.ScrapeError).HasMaxLength(1000);
             e.Property(t => t.SubmittedByIp).HasMaxLength(50);
-            e.Property(t => t.FetchStatus).HasConversion<string>().HasMaxLength(20);
+            e.Property(t => t.FetchStatus).HasMaxLength(20);
         });
 
-        modelBuilder.Entity<XUserProfile>(e =>
+        modelBuilder.Entity<XUserProfileRecord>(e =>
         {
+            e.ToTable("XUserProfiles");
             e.HasIndex(x => x.XUserId).IsUnique();
             e.Property(x => x.XUserId).HasMaxLength(50);
             e.Property(x => x.ScrapedUsername).HasMaxLength(100);
@@ -53,8 +56,9 @@ public class AppDbContext : DbContext
             e.Property(x => x.Description).HasMaxLength(2000);
         });
 
-        modelBuilder.Entity<Folder>(e =>
+        modelBuilder.Entity<FolderRecord>(e =>
         {
+            e.ToTable("Folders");
             e.HasIndex(f => f.ParentFolderId);
             e.Property(f => f.Name).HasMaxLength(200);
             e.Property(f => f.Description).HasMaxLength(1000);
@@ -64,19 +68,22 @@ public class AppDbContext : DbContext
              .OnDelete(DeleteBehavior.Restrict);
         });
 
-        modelBuilder.Entity<FolderTweet>(e =>
+        modelBuilder.Entity<FolderTweetRecord>(e =>
         {
+            e.ToTable("FolderTweets");
             e.HasKey(ft => new { ft.FolderId, ft.TweetId });
         });
 
-        modelBuilder.Entity<Vote>(e =>
+        modelBuilder.Entity<VoteRecord>(e =>
         {
+            e.ToTable("Votes");
             e.HasIndex(v => new { v.TweetId, v.VoterIp }).IsUnique();
             e.Property(v => v.VoterIp).HasMaxLength(50);
         });
 
-        modelBuilder.Entity<AuditLog>(e =>
+        modelBuilder.Entity<AuditLogRecord>(e =>
         {
+            e.ToTable("AuditLog");
             e.HasIndex(a => a.CorrelationId);
             e.Property(a => a.CorrelationId).HasMaxLength(36);
             e.Property(a => a.Action).HasMaxLength(100);
