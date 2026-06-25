@@ -1,0 +1,14 @@
+**/.git
+**/.vs
+**/.vscode
+**/.claude
+**/bin
+**/obj
+**/node_modules
+**/.gitignore
+**/.dockerignore
+**/README.md
+**/Requirements
+**/tests
+**/*.user
+**/*.suo

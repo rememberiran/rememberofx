@@ -1,0 +1,58 @@
+name: Deploy Infrastructure
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - dev
+          - prod
+      location:
+        description: 'Azure region'
+        required: true
+        default: 'eastus'
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy-infra:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ inputs.environment == 'prod' && secrets.AZURE_CLIENT_ID_PROD || secrets.AZURE_CLIENT_ID_DEV }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Create resource group
+        run: |
+          az group create \
+            --name rg-mox-${{ inputs.environment }} \
+            --location ${{ inputs.location }}
+
+      - name: Deploy Bicep template
+        run: |
+          az deployment group create \
+            --resource-group rg-mox-${{ inputs.environment }} \
+            --template-file infra/main.bicep \
+            --parameters \
+              environment=${{ inputs.environment }} \
+              location=${{ inputs.location }} \
+              sqlAdminPassword=${{ secrets.SQL_ADMIN_PASSWORD }}
+
+      - name: Show deployment outputs
+        run: |
+          az deployment group show \
+            --resource-group rg-mox-${{ inputs.environment }} \
+            --name main \
+            --query properties.outputs \
+            --output table
