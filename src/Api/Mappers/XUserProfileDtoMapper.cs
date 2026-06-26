@@ -1,4 +1,4 @@
-using Application.Models;
+﻿using Application.Models;
 using Domain.Entities;
 
 namespace Api.Mappers;
@@ -10,7 +10,7 @@ public static class XUserProfileDtoMapper
         return new XUserProfileDto(
             profile.Id,
             profile.XUserId,
-            profile.ScrapedUsername,
+            profile.XUsername,
             profile.CustomName,
             profile.Description);
     }

@@ -223,7 +223,7 @@ The queue message carries everything the Worker needs to create the tweet and re
 }
 ```
 
-When `fetchStatus = 'Ok'`, `tweetData` contains the full `TweetDto` (text, author, date, tags, screenshotUrl — SAS URL generated at this point).
+When `fetchStatus = 'Ok'`, `tweetData` contains the full `TweetDto` (text, author, date, tags, screenshotUrl, media — SAS URLs generated at this point).
 
 When `fetchStatus` is `NotFound`, `Private`, or `ScrapeFailed`, `tweetData` contains `{ fetchStatus, xTweetUrl }` for the frontend to show the appropriate badge.
 
@@ -288,6 +288,16 @@ Sorting:
 - `sort=date`: `ORDER BY CreatedAt DESC`
 
 Each result includes the author's `XUserProfile` as a nested `authorProfile` field (`{ customName, description }` or `null`).
+
+### TweetDto Media
+
+Each `TweetDto` includes a `media` array of attached images and videos. Each media item has:
+- `id` — unique identifier
+- `mediaType` — `"Image"` or `"Video"`
+- `url` — SAS URL to the downloaded media file in the `media` blob container (generated at read time); `null` if the download failed
+- `orderIndex` — ordering within the tweet (0-based)
+
+Media files are downloaded by the Worker and stored in the `media` blob container. The API generates time-limited SAS URLs on the fly — no URLs are stored in the database. If no media is attached, the array is empty.
 
 When searching by `userId`, if an `XUserProfile` exists, it is also returned as a top-level `subjectProfile` field above the paginated tweet list.
 

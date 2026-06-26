@@ -1,7 +1,9 @@
 using Api.Extensions;
 using Api.Mappers;
 using Api.Models.Requests;
+using Application;
 using Application.Interfaces;
+using Application.Models;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Api.Controllers;
@@ -11,12 +13,12 @@ namespace Api.Controllers;
 public class XUserProfilesController : ControllerBase
 {
     private readonly IXUserProfileService _profileService;
-    private readonly IUserService _userService;
+    private readonly IAsyncContext<IdentityContext> _identityContext;
 
-    public XUserProfilesController(IXUserProfileService profileService, IUserService userService)
+    public XUserProfilesController(IXUserProfileService profileService, IAsyncContext<IdentityContext> identityContext)
     {
         _profileService = profileService;
-        _userService = userService;
+        _identityContext = identityContext;
     }
 
     [HttpGet("{xUserId}")]
@@ -36,18 +38,7 @@ public class XUserProfilesController : ControllerBase
     [HttpPut("{xUserId}")]
     public async Task<IActionResult> UpsertProfile(string xUserId, [FromBody] UpsertXUserProfileRequest request, CancellationToken ct)
     {
-        Guid? userId = null;
-        var xUser = User.GetXUserId();
-        if (xUser != null)
-        {
-            var userResult = await _userService.GetByXUserIdAsync(xUser, ct);
-            if (userResult.IsSuccess)
-            {
-                userId = userResult.Value!.Id;
-            }
-        }
-
-        var result = await _profileService.UpsertAsync(xUserId, request.CustomName, request.Description, userId, ct);
+        var result = await _profileService.UpsertAsync(xUserId, request.CustomName, request.Description, _identityContext.Value?.InternalUserId, ct);
 
         if (!result.IsSuccess)
         {

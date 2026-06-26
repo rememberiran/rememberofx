@@ -2,8 +2,9 @@
 
 public class IdentityContext
 {
-    public string? UserId { get; init; }
-    public string? Username { get; init; }
-    public string? Email { get; init; }
+    public string? XUserId { get; init; }
+    public Guid? InternalUserId { get; init; }
+    public string? XUsername { get; init; }
+    public string? XEmail { get; init; }
     public string IpAddress { get; init; } = default!;
 }

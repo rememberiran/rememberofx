@@ -1,7 +1,9 @@
 using Api.Extensions;
 using Api.Mappers;
 using Api.Models.Requests;
+using Application;
 using Application.Interfaces;
+using Application.Models;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Api.Controllers;
@@ -11,10 +13,12 @@ namespace Api.Controllers;
 public class AdminController : ControllerBase
 {
     private readonly IUserService _userService;
+    private readonly IAsyncContext<IdentityContext> _identityContext;
 
-    public AdminController(IUserService userService)
+    public AdminController(IUserService userService, IAsyncContext<IdentityContext> identityContext)
     {
         _userService = userService;
+        _identityContext = identityContext;
     }
 
     [HttpGet("users")]
@@ -34,18 +38,7 @@ public class AdminController : ControllerBase
     [HttpPost("users")]
     public async Task<IActionResult> AddUser([FromBody] AddUserRequest request, CancellationToken ct)
     {
-        Guid? createdByUserId = null;
-        var xUserId = User.GetXUserId();
-        if (xUserId != null)
-        {
-            var currentUser = await _userService.GetByXUserIdAsync(xUserId, ct);
-            if (currentUser.IsSuccess)
-            {
-                createdByUserId = currentUser.Value!.Id;
-            }
-        }
-
-        var result = await _userService.AddAsync(request.XUserId, request.Role, createdByUserId, ct);
+        var result = await _userService.AddAsync(request.XUserId, request.Role, _identityContext.Value?.InternalUserId, ct);
 
         if (!result.IsSuccess)
         {

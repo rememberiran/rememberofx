@@ -11,7 +11,7 @@ public static class XUserProfileMapper
         {
             Id = record.Id,
             XUserId = record.XUserId,
-            ScrapedUsername = record.ScrapedUsername,
+            XUsername = record.XUsername,
             CustomName = record.CustomName,
             Description = record.Description,
             CreatedByUserId = record.CreatedByUserId,
@@ -29,7 +29,7 @@ public static class XUserProfileMapper
         {
             Id = entity.Id,
             XUserId = entity.XUserId,
-            ScrapedUsername = entity.ScrapedUsername,
+            XUsername = entity.XUsername,
             CustomName = entity.CustomName,
             Description = entity.Description,
             CreatedByUserId = entity.CreatedByUserId,

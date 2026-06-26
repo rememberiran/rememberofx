@@ -13,7 +13,14 @@ public record TweetDto(
     int VoteCount,
     string FetchStatus,
     DateTime CreatedAt,
+    IReadOnlyList<TweetMediaDto> Media,
     XUserProfileDto? AuthorProfile = null);
+
+public record TweetMediaDto(
+    Guid Id,
+    string MediaType,
+    string? Url,
+    int OrderIndex);
 
 public record TweetStatusDto(
     Guid TweetId,

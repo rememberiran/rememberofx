@@ -1,4 +1,4 @@
-using Application.Interfaces;
+﻿using Application.Interfaces;
 using Application.Models;
 using Domain.Entities;
 using Domain.Mappers;
@@ -12,12 +12,18 @@ namespace Application.Services;
 public class FolderService : IFolderService
 {
     private readonly IAppDbContext _db;
+    private readonly IAsyncContext<IdentityContext> _identityContext;
     private readonly FolderSettings _settings;
     private readonly ILogger<FolderService> _logger;
 
-    public FolderService(IAppDbContext db, IOptions<FolderSettings> settings, ILogger<FolderService> logger)
+    public FolderService(
+        IAppDbContext db,
+        IAsyncContext<IdentityContext> identityContext,
+        IOptions<FolderSettings> settings,
+        ILogger<FolderService> logger)
     {
         _db = db;
+        _identityContext = identityContext;
         _settings = settings.Value;
         _logger = logger;
     }
@@ -115,7 +121,7 @@ public class FolderService : IFolderService
         return Result.Success(new PagedResult<TweetWithAuthor>(items, totalCount));
     }
 
-    public async Task<Result<Folder>> CreateAsync(string name, string? description, Guid? parentFolderId, Guid createdByUserId, CancellationToken ct)
+    public async Task<Result<Folder>> CreateAsync(string name, string? description, Guid? parentFolderId, CancellationToken ct)
     {
         if (parentFolderId.HasValue)
         {
@@ -132,7 +138,13 @@ public class FolderService : IFolderService
             }
         }
 
-        var userFolderCount = await _db.Folders.CountAsync(f => f.CreatedByUserId == createdByUserId && f.IsActive, ct);
+        var userId = _identityContext.Value?.InternalUserId;
+        if (userId is null)
+        {
+            return Result.Failure<Folder>(DomainError.Unauthorized("User not authenticated"));
+        }
+
+        var userFolderCount = await _db.Folders.CountAsync(f => f.CreatedByUserId == userId && f.IsActive, ct);
         if (userFolderCount >= _settings.MaxPerContributor)
         {
             return Result.Failure<Folder>(DomainError.Validation($"Maximum of {_settings.MaxPerContributor} folders per contributor exceeded"));
@@ -144,12 +156,12 @@ public class FolderService : IFolderService
             Name = name,
             Description = description,
             ParentFolderId = parentFolderId,
-            CreatedByUserId = createdByUserId,
+            CreatedByUserId = userId.Value,
         };
 
         _db.Folders.Add(folder);
 
-        _logger.LogInformation("Folder created: {FolderId} by user {UserId}", folder.Id, createdByUserId);
+        _logger.LogInformation("Folder created: {FolderId} by user {UserId}", folder.Id, userId);
 
         return Result.Success(FolderMapper.ToDomain(folder));
     }
@@ -202,8 +214,14 @@ public class FolderService : IFolderService
         return Result.Success(FolderMapper.ToDomain(folder));
     }
 
-    public async Task<Result> AddTweetAsync(Guid folderId, Guid tweetId, Guid addedByUserId, CancellationToken ct)
+    public async Task<Result> AddTweetAsync(Guid folderId, Guid tweetId, CancellationToken ct)
     {
+        var userId = _identityContext.Value?.InternalUserId;
+        if (userId is null)
+        {
+            return Result.Failure<Folder>(DomainError.Unauthorized("User not authenticated"));
+        }
+
         var folderExists = await _db.Folders.AnyAsync(f => f.Id == folderId && f.IsActive, ct);
         if (!folderExists)
         {
@@ -232,7 +250,7 @@ public class FolderService : IFolderService
         {
             FolderId = folderId,
             TweetId = tweetId,
-            AddedByUserId = addedByUserId,
+            AddedByUserId = userId.Value,
         });
 
         _logger.LogInformation("Tweet {TweetId} added to folder {FolderId}", tweetId, folderId);

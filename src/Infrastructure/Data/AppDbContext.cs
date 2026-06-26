@@ -16,6 +16,7 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<FolderRecord> Folders => Set<FolderRecord>();
     public DbSet<FolderTweetRecord> FolderTweets => Set<FolderTweetRecord>();
     public DbSet<VoteRecord> Votes => Set<VoteRecord>();
+    public DbSet<TweetMediaRecord> TweetMedia => Set<TweetMediaRecord>();
     public DbSet<AuditLogRecord> AuditLogs => Set<AuditLogRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -52,7 +53,7 @@ public class AppDbContext : DbContext, IAppDbContext
             e.ToTable($"XUserProfiles");
             e.HasIndex(x => x.XUserId).IsUnique();
             e.Property(x => x.XUserId).HasMaxLength(50);
-            e.Property(x => x.ScrapedUsername).HasMaxLength(100);
+            e.Property(x => x.XUsername).HasMaxLength(100);
             e.Property(x => x.CustomName).HasMaxLength(200);
             e.Property(x => x.Description).HasMaxLength(2000);
         });
@@ -73,6 +74,19 @@ public class AppDbContext : DbContext, IAppDbContext
         {
             e.ToTable($"FolderTweets");
             e.HasKey(ft => new { ft.FolderId, ft.TweetId });
+        });
+
+        modelBuilder.Entity<TweetMediaRecord>(e =>
+        {
+            e.ToTable($"TweetMedia");
+            e.HasIndex(m => m.TweetId);
+            e.Property(m => m.MediaType).HasMaxLength(10);
+            e.Property(m => m.BlobName).HasMaxLength(200);
+            e.Property(m => m.OriginalUrl).HasMaxLength(500);
+            e.HasOne(m => m.Tweet)
+             .WithMany(t => t.Media)
+             .HasForeignKey(m => m.TweetId)
+             .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<VoteRecord>(e =>

@@ -1,6 +1,7 @@
-using Api.Extensions;
+﻿using Api.Extensions;
 using Api.Mappers;
 using Api.Models.Requests;
+using Application;
 using Application.Interfaces;
 using Application.Models;
 using Microsoft.AspNetCore.Mvc;
@@ -12,16 +13,16 @@ namespace Api.Controllers;
 public class FoldersController : ControllerBase
 {
     private readonly IFolderService _folderService;
-    private readonly IUserService _userService;
+    private readonly IAsyncContext<IdentityContext> _identityContext;
     private readonly TweetDtoMapper _tweetDtoMapper;
 
     public FoldersController(
         IFolderService folderService,
-        IUserService userService,
+        IAsyncContext<IdentityContext> identityContext,
         TweetDtoMapper tweetDtoMapper)
     {
         _folderService = folderService;
-        _userService = userService;
+        _identityContext = identityContext;
         _tweetDtoMapper = tweetDtoMapper;
     }
 
@@ -102,14 +103,14 @@ public class FoldersController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateFolderRequest request, CancellationToken ct)
     {
-        var userId = await ResolveUserIdAsync(ct);
+        var userId = _identityContext.Value?.InternalUserId;
         if (userId is null)
         {
             return Unauthorized();
         }
 
         var result = await _folderService.CreateAsync(
-            request.Name, request.Description, request.ParentFolderId, userId.Value, ct);
+            request.Name, request.Description, request.ParentFolderId, ct);
 
         if (!result.IsSuccess)
         {
@@ -137,13 +138,7 @@ public class FoldersController : ControllerBase
     [HttpPost("{folderId:guid}/tweets/{tweetId:guid}")]
     public async Task<IActionResult> AddTweet(Guid folderId, Guid tweetId, CancellationToken ct)
     {
-        var userId = await ResolveUserIdAsync(ct);
-        if (userId is null)
-        {
-            return Unauthorized();
-        }
-
-        var result = await _folderService.AddTweetAsync(folderId, tweetId, userId.Value, ct);
+        var result = await _folderService.AddTweetAsync(folderId, tweetId, ct);
         return result.IsSuccess ? NoContent() : result.ToActionResult();
     }
 
@@ -152,17 +147,5 @@ public class FoldersController : ControllerBase
     {
         var result = await _folderService.RemoveTweetAsync(folderId, tweetId, ct);
         return result.IsSuccess ? NoContent() : result.ToActionResult();
-    }
-
-    private async Task<Guid?> ResolveUserIdAsync(CancellationToken ct)
-    {
-        var xUserId = User.GetXUserId();
-        if (xUserId is null)
-        {
-            return null;
-        }
-
-        var userResult = await _userService.GetByXUserIdAsync(xUserId, ct);
-        return userResult.IsSuccess ? userResult.Value!.Id : null;
     }
 }

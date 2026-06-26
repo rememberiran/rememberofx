@@ -23,6 +23,7 @@ public class Tweet
     public DateTime? ScrapedAt { get; set; }
 
     public User? SubmittedByUser { get; set; }
+    public ICollection<TweetMedia> Media { get; set; } = new List<TweetMedia>();
     public ICollection<FolderTweet> FolderTweets { get; set; } = new List<FolderTweet>();
     public ICollection<Vote> Votes { get; set; } = new List<Vote>();
 }

@@ -82,16 +82,23 @@ Each message contains: `{ xTweetUrl, xTweetId, authorXUsername, folderIds, submi
    - `AuthorXUsername` — `@handle` from the author link
    - `AuthorXUserId` — parse from profile link URL (e.g. `/i/user/{id}`) or data attributes
    - `Tags` — all `#hashtag` anchor links in the tweet body → JSON array
+   - **Media URLs** — all `<img>` sources within the tweet media container (images) and `<video>` sources (videos). Collect original URLs and media type (`Image` or `Video`) in order of appearance.
 8. Capture PNG screenshot of the `<article>` element only (not full page): `await element.ScreenshotAsync()`.
 9. Upload PNG to Azure Blob Storage — container: `screenshots`, blob name: `{XTweetId}.png`. If upload fails: log `Error`, set `ScreenshotBlobName = null`, continue (see §6.2).
-10. **SQL transaction (see §7):**
+10. **Download and upload media files** — for each media URL extracted in step 7:
+    - Download the media file from the original URL.
+    - Upload to Azure Blob Storage — container: `media`, blob name: `{XTweetId}_{orderIndex}.{ext}` (e.g., `123456_0.jpg`, `123456_1.mp4`).
+    - If download or upload fails for a specific media item: log `Error`, set `BlobName = null` for that item, continue — partial media failure does not block archival.
+    - Insert a `TweetMedia` row per media item with `MediaType`, `BlobName`, `OriginalUrl`, and `OrderIndex`.
+11. **SQL transaction (see §7):**
     - **Insert `Tweet` row** with all scraped data, `FetchStatus='Ok'`, and submission metadata from the queue message (`SubmittedByUserId`, `SubmittedByIp`).
+    - **Insert `TweetMedia` rows** for each media item extracted and downloaded (see step 10).
     - **Upsert `XUserProfiles`** using `AuthorXUserId` from scrape:
       - No row exists → insert stub: `XUserId`, `ScrapedUsername`, `CustomName = NULL`, `CreatedByUserId = NULL`
       - Row exists → update `ScrapedUsername` (handle may have changed)
     - **Insert `FolderTweet` rows** if `folderIds` were provided in the message.
     - **Insert `AuditLog`** row: `Action='Tweet.Scraped'`.
-11. Delete message from queue (signals successful processing).
+12. Delete message from queue (signals successful processing).
 
 ---
 
@@ -164,6 +171,13 @@ If Azure Blob Storage is unreachable during screenshot upload:
 - Set `ScreenshotBlobName = null` — tweet text and metadata are still archived
 - Continue to the SQL transaction — blob failure does not block archival
 
+### Media Download/Upload Failure
+
+Each media item is downloaded and uploaded independently. If a specific media item fails:
+- Log `Error` with `CorrelationId` and media index; increment `media.failure` OTel counter
+- Set `BlobName = null` for that `TweetMedia` row — `OriginalUrl` is still preserved for retry or manual download
+- Continue processing remaining media items — partial failure does not block archival
+
 ---
 
 ## 7. Worker Transaction Boundary
@@ -178,6 +192,9 @@ BEGIN TRANSACTION
     (Id, XTweetId, XTweetUrl, FetchStatus='Ok', AuthorXUserId, AuthorXUsername,
      TweetText, TweetDate, Tags, ScreenshotBlobName, ScrapedAt,
      ScrapeAttempts, SubmittedByUserId, SubmittedByIp, CreatedAt)
+
+  INSERT INTO TweetMedia (Id, TweetId, MediaType, BlobName, OriginalUrl, OrderIndex, CreatedAt)
+    -- for each media item extracted from the tweet (images and videos)
 
   INSERT OR UPDATE XUserProfiles (XUserId, ScrapedUsername, ...)
     -- upsert: create stub if absent, update ScrapedUsername if present

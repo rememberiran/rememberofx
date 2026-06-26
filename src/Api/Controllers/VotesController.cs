@@ -1,5 +1,7 @@
 ﻿using Api.Extensions;
+using Application;
 using Application.Interfaces;
+using Application.Models;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Api.Controllers;
@@ -9,29 +11,18 @@ namespace Api.Controllers;
 public class VotesController : ControllerBase
 {
     private readonly IVoteService _voteService;
-    private readonly IUserService _userService;
+    private readonly IAsyncContext<IdentityContext> _identityContext;
 
-    public VotesController(IVoteService voteService, IUserService userService)
+    public VotesController(IVoteService voteService, IAsyncContext<IdentityContext> identityContext)
     {
         _voteService = voteService;
-        _userService = userService;
+        _identityContext = identityContext;
     }
 
     [HttpPost("{tweetId:guid}")]
     public async Task<IActionResult> CastVote(Guid tweetId, CancellationToken ct)
     {
-        Guid? voterUserId = null;
-        var xUserId = User.GetXUserId();
-        if (xUserId != null)
-        {
-            var userResult = await _userService.GetByXUserIdAsync(xUserId, ct);
-            if (userResult.IsSuccess)
-            {
-                voterUserId = userResult.Value!.Id;
-            }
-        }
-
-        var result = await _voteService.CastVoteAsync(tweetId, voterUserId, ct);
+        var result = await _voteService.CastVoteAsync(tweetId, _identityContext.Value?.InternalUserId, ct);
 
         return result.IsSuccess
             ? Ok(new { message = $"Vote recorded" })

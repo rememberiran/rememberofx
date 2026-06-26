@@ -28,6 +28,8 @@ public class VoteService : IVoteService
             return Result.Failure(DomainError.NotFound($"Tweet not found"));
         }
 
+        var incrementCount = true;
+
         if (voterUserId.HasValue)
         {
             var existingByUser = await _db.Votes
@@ -37,31 +39,11 @@ public class VoteService : IVoteService
                 return Result.Failure(DomainError.Conflict($"Already voted"));
             }
 
-            // Auth overrides anonymous: if same user voted anonymously from same IP, don't increment
             var anonymousVoteFromSameIp = await _db.Votes
                 .AnyAsync(v => v.TweetId == tweetId && v.VoterIp == voterIp && v.VoterUserId == null, ct);
             if (anonymousVoteFromSameIp)
             {
-                // Record the authenticated vote but don't increment count
-                _db.Votes.Add(new VoteRecord
-                {
-                    Id = Guid.NewGuid(),
-                    TweetId = tweetId,
-                    VoterIp = voterIp,
-                    VoterUserId = voterUserId,
-                });
-
-                _logger.LogInformation("Authenticated vote recorded for tweet {TweetId} by user {UserId} (count not incremented, anonymous vote exists from same IP)", tweetId, voterUserId);
-                return Result.Success();
-            }
-        }
-        else
-        {
-            var existingByIp = await _db.Votes
-                .AnyAsync(v => v.TweetId == tweetId && v.VoterIp == voterIp, ct);
-            if (existingByIp)
-            {
-                return Result.Failure(DomainError.Conflict($"Already voted"));
+                incrementCount = false;
             }
         }
 
@@ -73,8 +55,28 @@ public class VoteService : IVoteService
             VoterUserId = voterUserId,
         });
 
-        await _db.Database.ExecuteSqlRawAsync(
-$"UPDATE Tweets SET VoteCount = VoteCount + 1 WHERE Id = {0}", tweetId, ct);
+        try
+        {
+            // Explicit save + transaction: the unique index on (TweetId, VoterIp) prevents
+            // duplicate votes at the DB level, avoiding the check-then-act race condition.
+            await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+            await _db.SaveChangesAsync(ct);
+
+            if (incrementCount)
+            {
+                await _db.Database.ExecuteSqlRawAsync(
+                    "UPDATE Tweets SET VoteCount = VoteCount + 1 WHERE Id = {0}",
+                    tweetId,
+                    ct);
+            }
+
+            await transaction.CommitAsync(ct);
+        }
+        catch (DbUpdateException)
+        {
+            _db.ChangeTracker.Clear();
+            return Result.Failure(DomainError.Conflict($"Already voted"));
+        }
 
         _logger.LogInformation("Vote cast for tweet {TweetId} by {VoterIdentity}", tweetId, voterUserId?.ToString() ?? voterIp);
         return Result.Success();

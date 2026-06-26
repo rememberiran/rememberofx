@@ -1,4 +1,4 @@
-using Application.Interfaces;
+﻿using Application.Interfaces;
 using Domain.Entities;
 using Domain.Mappers;
 using Microsoft.EntityFrameworkCore;
@@ -20,7 +20,7 @@ public class XUserProfileService : IXUserProfileService
 
     public async Task<Result<XUserProfile>> GetByXUserIdAsync(string xUserId, CancellationToken ct)
     {
-        var profile = await _db.XUserProfiles.AsNoTracking().FirstOrDefaultAsync(p => p.XUserId == xUserId, ct);
+        var profile = await _db.XUserProfiles.AsNoTracking().FirstOrDefaultAsync(p => p.XUserId == xUserId || p.XUsername == xUserId, ct);
         if (profile is null)
         {
             return Result.Failure<XUserProfile>(DomainError.NotFound($"X user profile not found"));

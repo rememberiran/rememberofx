@@ -28,6 +28,7 @@ public static class TweetMapper
             CreatedAt = record.CreatedAt,
             ScrapedAt = record.ScrapedAt,
             SubmittedByUser = record.SubmittedByUser is not null ? UserMapper.ToDomain(record.SubmittedByUser) : null,
+            Media = record.Media.Select(TweetMediaMapper.ToDomain).ToList(),
             FolderTweets = record.FolderTweets.Select(FolderTweetMapper.ToDomain).ToList(),
             Votes = record.Votes.Select(VoteMapper.ToDomain).ToList(),
         };

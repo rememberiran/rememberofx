@@ -74,6 +74,22 @@ A row is inserted immediately on submission with `FetchStatus='Pending'` and all
 
 `ScreenshotBlobName` stores only the blob name, not a URL or SAS token. SAS URLs are generated on-the-fly at read time using a user-delegation SAS tied to Managed Identity — never stored in the database.
 
+### `TweetMedia`
+
+Stores references to downloaded media files (images and videos) attached to a tweet. Each media file is downloaded by the Worker and uploaded to the `media` blob container. A tweet can have zero or more media items.
+
+| Column | Type | Constraints |
+|---|---|---|
+| `Id` | `UNIQUEIDENTIFIER` | PK, default `NEWID()` |
+| `TweetId` | `UNIQUEIDENTIFIER` | FK → `Tweets.Id` (CASCADE), NOT NULL |
+| `MediaType` | `NVARCHAR(10)` | NOT NULL — `'Image'` or `'Video'` |
+| `BlobName` | `NVARCHAR(200)` | nullable — blob name in `media` container (e.g. `{XTweetId}_0.jpg`); SAS URL generated at read time |
+| `OriginalUrl` | `NVARCHAR(500)` | nullable — original media URL from the tweet |
+| `OrderIndex` | `INT` | NOT NULL — ordering of media within the tweet (0-based) |
+| `CreatedAt` | `DATETIME2` | NOT NULL, default `GETUTCDATE()` |
+
+`BlobName` stores only the blob name within the `media` container. SAS URLs are generated on-the-fly at read time, same as `ScreenshotBlobName`. `OriginalUrl` preserves the source URL for provenance tracking.
+
 ### `XUserProfiles`
 
 Describes the *subjects* being archived — the people whose tweets are captured. Not to be confused with `Users`, which is the app's access roster.
@@ -159,6 +175,7 @@ Write-only. All write interactions across the system are recorded here. Read int
 | Non-clustered | `Tweets.FetchStatus` | Worker queries on `'Pending'` / `'Processing'` |
 | Non-clustered | `Folders.ParentFolderId` | Fetching children of a folder |
 | Unique | `XUserProfiles.XUserId` | Profile lookup by X user ID |
+| Non-clustered | `TweetMedia.TweetId` | Fetch media for a tweet |
 | Non-clustered | `AuditLog.CorrelationId` | Log tracing by correlation ID |
 
 ---

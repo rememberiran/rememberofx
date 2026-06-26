@@ -15,6 +15,15 @@ public class TweetDtoMapper
 
     public TweetDto ToDto(Tweet tweet, XUserProfile? authorProfile = null)
     {
+        var media = tweet.Media
+            .OrderBy(m => m.OrderIndex)
+            .Select(m => new TweetMediaDto(
+                m.Id,
+                m.MediaType.ToString(),
+                _blobStorage.GetMediaSasUrl(m.BlobName),
+                m.OrderIndex))
+            .ToList();
+
         return new TweetDto(
             tweet.Id,
             tweet.XTweetId,
@@ -28,6 +37,7 @@ public class TweetDtoMapper
             tweet.VoteCount,
             tweet.FetchStatus.ToString(),
             tweet.CreatedAt,
+            media,
             authorProfile != null ? XUserProfileDtoMapper.ToDto(authorProfile) : null);
     }
 

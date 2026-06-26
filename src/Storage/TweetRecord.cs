@@ -21,6 +21,7 @@ public class TweetRecord
     public DateTime? ScrapedAt { get; set; }
 
     public UserRecord? SubmittedByUser { get; set; }
+    public ICollection<TweetMediaRecord> Media { get; set; } = new List<TweetMediaRecord>();
     public ICollection<FolderTweetRecord> FolderTweets { get; set; } = new List<FolderTweetRecord>();
     public ICollection<VoteRecord> Votes { get; set; } = new List<VoteRecord>();
 }

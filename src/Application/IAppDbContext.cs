@@ -13,6 +13,7 @@ public interface IAppDbContext
     DbSet<FolderRecord> Folders { get; }
     DbSet<FolderTweetRecord> FolderTweets { get; }
     DbSet<VoteRecord> Votes { get; }
+    DbSet<TweetMediaRecord> TweetMedia { get; }
     DbSet<AuditLogRecord> AuditLogs { get; }
     DatabaseFacade Database { get; }
     ChangeTracker ChangeTracker { get; }

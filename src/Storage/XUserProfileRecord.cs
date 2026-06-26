@@ -4,7 +4,7 @@ public class XUserProfileRecord
 {
     public Guid Id { get; set; }
     public string XUserId { get; set; } = default!;
-    public string? ScrapedUsername { get; set; }
+    public string? XUsername { get; set; }
     public string? CustomName { get; set; }
     public string? Description { get; set; }
     public Guid? CreatedByUserId { get; set; }
