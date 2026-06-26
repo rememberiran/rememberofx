@@ -1,4 +1,4 @@
-namespace Application.Models;
+﻿namespace Application.Models;
 
 public record FolderDto(
     Guid Id,
@@ -8,8 +8,8 @@ public record FolderDto(
     int ChildCount,
     DateTime CreatedAt,
     bool IsActive,
-    List<FolderSummaryDto>? Children = null,
-    List<FolderBreadcrumbDto>? Breadcrumb = null);
+    IReadOnlyList<FolderSummaryDto>? Children = null,
+    IReadOnlyList<FolderBreadcrumbDto>? Breadcrumb = null);
 
 public record FolderSummaryDto(
     Guid Id,

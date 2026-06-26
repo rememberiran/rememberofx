@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using Application.Interfaces;
 using Application.Models;
 using Azure.Storage.Queues;
@@ -14,8 +14,8 @@ public class ScrapeQueueService : IScrapeQueueService
 
     public ScrapeQueueService(IConfiguration configuration, ILogger<ScrapeQueueService> logger)
     {
-        var accountUrl = configuration["Queue:AccountUrl"];
-        var queueName = configuration["Queue:QueueName"] ?? "scrape-jobs";
+        var accountUrl = configuration[$"Queue:AccountUrl"];
+        var queueName = configuration[$"Queue:QueueName"] ?? $"scrape-jobs";
 
         _queueClient = new QueueClient(new Uri($"{accountUrl}{queueName}"), new Azure.Identity.DefaultAzureCredential());
         _logger = logger;

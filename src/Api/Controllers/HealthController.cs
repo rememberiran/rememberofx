@@ -1,4 +1,4 @@
-using Application;
+﻿using Application;
 using Application.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 
@@ -22,7 +22,7 @@ public class HealthController : ControllerBase
     [HttpGet("live")]
     public IActionResult Live()
     {
-        return Ok(new { status = "Healthy" });
+        return Ok(new { status = $"Healthy" });
     }
 
     [HttpGet("ready")]
@@ -37,7 +37,7 @@ public class HealthController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Database health check failed");
+            _logger.LogWarning(ex, $"Database health check failed");
         }
 
         try
@@ -46,11 +46,11 @@ public class HealthController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Queue health check failed");
+            _logger.LogWarning(ex, $"Queue health check failed");
         }
 
         var ready = dbHealthy && queueHealthy;
-        var response = new { status = ready ? "Ready" : "Unhealthy", db = dbHealthy, queue = queueHealthy };
+        var response = new { status = ready ? $"Ready" : $"Unhealthy", db = dbHealthy, queue = queueHealthy };
 
         return ready ? Ok(response) : StatusCode(503, response);
     }

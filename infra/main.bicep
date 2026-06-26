@@ -88,6 +88,9 @@ module containerEnv 'modules/container-env.bicep' = {
 }
 
 // --- Container App: Backend API ---
+// Network isolation: internal ingress only — reachable by Frontend and Worker
+// within the same Container Apps Environment via internal DNS (http://ca-mox-api-{env}).
+// Not accessible from the public internet. No API keys or mTLS needed.
 module apiApp 'modules/container-app.bicep' = {
   name: 'ca-api-${environment}'
   params: {
@@ -95,6 +98,7 @@ module apiApp 'modules/container-app.bicep' = {
     location: location
     containerEnvId: containerEnv.outputs.envId
     ingressType: 'internal'
+    allowInsecure: true // HTTP within ACA environment — no TLS overhead for internal traffic
     cpu: '0.5'
     memory: '1Gi'
     minReplicas: 0

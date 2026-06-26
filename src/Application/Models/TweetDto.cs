@@ -1,4 +1,4 @@
-namespace Application.Models;
+﻿namespace Application.Models;
 
 public record TweetDto(
     Guid Id,

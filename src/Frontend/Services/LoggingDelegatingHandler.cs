@@ -10,15 +10,19 @@ public class LoggingDelegatingHandler : DelegatingHandler
     }
 
     protected override async Task<HttpResponseMessage> SendAsync(
-        HttpRequestMessage request, CancellationToken ct)
+        HttpRequestMessage request, CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Outbound {Method} {Uri}",
-            request.Method, request.RequestUri);
+        _logger.LogInformation(
+            "Outbound {Method} {Uri}",
+            request.Method,
+            request.RequestUri);
 
-        var response = await base.SendAsync(request, ct);
+        var response = await base.SendAsync(request, cancellationToken);
 
-        _logger.LogInformation("Outbound response {StatusCode} from {Uri}",
-            (int)response.StatusCode, request.RequestUri);
+        _logger.LogInformation(
+            "Outbound response {StatusCode} from {Uri}",
+            (int)response.StatusCode,
+            request.RequestUri);
 
         return response;
     }

@@ -1,4 +1,4 @@
-namespace Storage;
+﻿namespace Storage;
 
 public class UserRecord
 {

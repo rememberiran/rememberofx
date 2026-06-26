@@ -1,4 +1,4 @@
-namespace Application;
+﻿namespace Application;
 
 public class DomainError
 {
@@ -13,9 +13,9 @@ public class DomainError
         StatusCode = statusCode;
     }
 
-    public static DomainError Validation(string message) => new("VALIDATION_ERROR", message, 400);
-    public static DomainError Unauthorized(string message) => new("UNAUTHORIZED", message, 401);
-    public static DomainError Forbidden(string message) => new("FORBIDDEN", message, 403);
+    public static DomainError Validation(string message) => new($"VALIDATION_ERROR", message, 400);
+    public static DomainError Unauthorized(string message) => new($"UNAUTHORIZED", message, 401);
+    public static DomainError Forbidden(string message) => new($"FORBIDDEN", message, 403);
     public static DomainError NotFound(string message) => new("NOT_FOUND", message, 404);
     public static DomainError Conflict(string message) => new("CONFLICT", message, 409);
 }

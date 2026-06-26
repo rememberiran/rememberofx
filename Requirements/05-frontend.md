@@ -234,12 +234,14 @@ src/Frontend/
 1. User clicks Login → redirect to `https://twitter.com/i/oauth2/authorize` with `client_id`, `redirect_uri`, `scope=tweet.read users.read`, `code_challenge` (PKCE S256), `state` (CSRF token stored in session).
 2. X redirects to `/auth/callback?code=xxx&state=yyy`.
 3. Verify `state` matches session CSRF token. On mismatch: return `400`, log `Auth.CsrfMismatch`.
-4. Exchange code: `POST https://api.twitter.com/2/oauth2/token`.
-5. Call `GET https://api.twitter.com/2/users/me` to get `id` and `username`.
-6. Call Backend `GET /api/auth/verify?xUserId={id}` — verifies user is in `Users` table with `IsActive=true`, returns signed JWT.
-7. Store JWT in **secure HttpOnly cookie** (`SameSite=Strict`, 8h expiry).
-8. Write audit log `Auth.Login`.
-9. If backend returns `403`: show **"Access denied — your X account is not registered."** Write audit log `Auth.Denied`.
+4. Exchange code: `POST https://api.twitter.com/2/oauth2/token` → receive X access token.
+5. Call Backend `POST /api/auth/token` with `{ xAccessToken }` — the Backend validates the token with X API, looks up the user, and returns a signed application JWT (see `02-backend-api.md §9`).
+6. Store JWT in **secure HttpOnly cookie** (`SameSite=Strict`, 8h expiry).
+7. If backend returns `200`: login complete.
+8. If backend returns `401`: show **"Login failed — could not verify your X account. Please try again."**
+9. If backend returns `403`: show **"Access denied — your X account is not registered."**
+
+The Frontend never calls the X API for user info — that responsibility belongs to the Backend. The Frontend only handles the OAuth redirect and code exchange, then delegates identity resolution to the Backend via `POST /api/auth/token`.
 
 **Logout:**
 - Navigate to `/auth/logout`.

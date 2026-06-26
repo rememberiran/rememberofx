@@ -1,4 +1,4 @@
-using Api.Extensions;
+﻿using Api.Extensions;
 using Api.Models.Requests;
 using Application.Interfaces;
 using Microsoft.AspNetCore.Mvc;
@@ -34,7 +34,9 @@ public class XUserProfilesController : ControllerBase
         {
             var userResult = await _userService.GetByXUserIdAsync(xUser, ct);
             if (userResult.IsSuccess)
+            {
                 userId = userResult.Value!.Id;
+            }
         }
 
         var result = await _profileService.UpsertAsync(xUserId, request.CustomName, request.Description, userId, ct);

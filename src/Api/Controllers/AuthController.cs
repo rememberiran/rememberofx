@@ -1,4 +1,5 @@
-using Api.Extensions;
+﻿using Api.Extensions;
+using Api.Models.Requests;
 using Application.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 
@@ -15,16 +16,16 @@ public class AuthController : ControllerBase
         _authService = authService;
     }
 
-    [HttpGet("verify")]
-    public async Task<IActionResult> Verify([FromQuery] string xUserId, CancellationToken ct)
+    [HttpPost("token")]
+    public async Task<IActionResult> ExchangeToken([FromBody] ExchangeTokenRequest request, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(xUserId))
-            return BadRequest(new { message = "xUserId query parameter is required" });
-
-        var result = await _authService.VerifyAndGenerateTokenAsync(xUserId, ct);
+        var result = await _authService.ExchangeTokenAsync(
+            request.XAccessToken,
+            HttpContext.GetClientIp(),
+            ct);
 
         return result.IsSuccess
-            ? Ok(new { token = result.Value })
+            ? Ok(new { token = result.Value!.Token, expiresAt = result.Value.ExpiresAt })
             : result.ToActionResult();
     }
 }

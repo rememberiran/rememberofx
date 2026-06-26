@@ -1,7 +1,7 @@
-namespace Application.Models;
+﻿namespace Application.Models;
 
 public record SubmitTweetCommand(
     string TweetUrl,
-    List<Guid>? FolderIds,
+    IReadOnlyList<Guid>? FolderIds,
     string SubmittedByIp,
     Guid? SubmittedByUserId);

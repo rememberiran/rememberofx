@@ -152,6 +152,7 @@ src/
 | `GET` | `/api/folders/{id}/tweets` | Tweets in a folder; `?sort=votes\|date` — `FetchStatus='Ok'` only |
 | `GET` | `/api/xusers/{xUserId}` | Get X user profile — `200` for stub or full; `404` if no tweets ever submitted |
 | `POST` | `/api/votes/{tweetId}` | Cast a vote |
+| `POST` | `/api/auth/token` | Exchange X access token for application JWT — see §9 |
 | `GET` | `/health/live` | Liveness probe |
 | `GET` | `/health/ready` | Readiness — checks DB and queue connectivity |
 
@@ -175,7 +176,6 @@ src/
 | `POST` | `/api/admin/users` | Add user — `{ xUserId, role }` |
 | `PUT` | `/api/admin/users/{id}` | Update role or `IsActive` |
 | `DELETE` | `/api/admin/users/{id}` | Deactivate (soft delete) |
-| `GET` | `/api/auth/verify` | `?xUserId=xxx` — verify user is active, return signed JWT |
 
 ---
 
@@ -306,9 +306,34 @@ Handled entirely in `VoteService`. Logic:
 
 ---
 
-## 9. JWT Specification
+## 9. Authentication — Token Exchange
 
-- **Algorithm:** HS256 (shared secret between Backend and Frontend)
+### 9.1 Auth Flow
+
+The Frontend handles X OAuth 2.0 PKCE and obtains an X access token. It then sends that token to the Backend, which validates it, resolves the user, and issues an application JWT. The Backend is the **sole JWT issuer** — the Frontend never inspects or creates JWTs.
+
+#### `POST /api/auth/token`
+
+**Request:**
+```json
+{ "xAccessToken": "..." }
+```
+
+**Backend logic (`AuthService.ExchangeTokenAsync`):**
+
+1. Call `GET https://api.twitter.com/2/users/me` with `Authorization: Bearer {xAccessToken}` to extract `id` and `username`.
+2. If the X API call fails (invalid or expired token): return `401` with `{ message: "Invalid or expired X token" }`.
+3. Look up `Users` table by `XUserId = id`.
+4. If not found or `IsActive = false`: return `403` with `{ message: "Access denied — your X account is not registered" }`. Write `AuditLog` with `Action = 'Auth.Denied'`.
+5. Issue a signed JWT with the claims listed below.
+6. Write `AuditLog` with `Action = 'Auth.Login'`.
+7. Return `200` with `{ token, expiresAt }`.
+
+**Note:** The Backend calls the X API server-side using a plain `HttpClient` — no X OAuth client credentials needed. The user's access token is sufficient to call the `/2/users/me` endpoint.
+
+### 9.2 JWT Specification
+
+- **Algorithm:** HS256 (shared secret — Backend signs, Backend validates)
 - **Issuer:** `Jwt:Issuer` config key (e.g., `https://memoryofx.com`)
 - **Expiry:** 8 hours (`exp` claim)
 - **Clock skew tolerance:** 2 minutes (ASP.NET Core default)
@@ -316,8 +341,8 @@ Handled entirely in `VoteService`. Logic:
 | Claim | Value |
 |---|---|
 | `sub` | `Users.XUserId` |
-| `username` | `Users.XUsername` |
-| `role` | `'Admin'` or `'Contributor'` |
+| `username` | `Users.XUsername` (from X API response) |
+| `role` | `'Admin'` or `'Contributor'` (from `Users` table) |
 | `jti` | `Guid.NewGuid()` |
 | `iat` | Issued-at Unix timestamp |
 | `exp` | Expiry Unix timestamp |

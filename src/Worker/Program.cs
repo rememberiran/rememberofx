@@ -1,4 +1,4 @@
-using Azure.Identity;
+﻿using Azure.Identity;
 using Azure.Monitor.OpenTelemetry.AspNetCore;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
@@ -8,7 +8,7 @@ var builder = Host.CreateApplicationBuilder(args);
 
 var credential = new DefaultAzureCredential();
 
-var kvUri = builder.Configuration["KeyVault:Uri"];
+var kvUri = builder.Configuration[$"KeyVault:Uri"];
 if (!string.IsNullOrEmpty(kvUri))
 {
     try
@@ -20,26 +20,31 @@ if (!string.IsNullOrEmpty(kvUri))
         Console.WriteLine($"Warning: Could not connect to Key Vault at {kvUri}. {ex.Message}");
     }
 }
+
 builder.Configuration.AddEnvironmentVariables();
 
 var otel = builder.Services.AddOpenTelemetry();
 otel.WithTracing(t =>
 {
     if (builder.Environment.IsDevelopment())
+    {
         t.AddConsoleExporter();
+    }
 });
 otel.WithMetrics(m =>
 {
-    m.AddMeter("MemoryOfX");
+    m.AddMeter($"MemoryOfX");
     if (builder.Environment.IsDevelopment())
+    {
         m.AddConsoleExporter();
+    }
 });
 
 if (!builder.Environment.IsDevelopment())
 {
     builder.Services.AddOpenTelemetry()
         .UseAzureMonitor(o =>
-            o.ConnectionString = builder.Configuration["ApplicationInsights:ConnectionString"]);
+            o.ConnectionString = builder.Configuration[$"ApplicationInsights:ConnectionString"]);
 }
 
 builder.Services.AddHostedService<ScrapeWorker>();

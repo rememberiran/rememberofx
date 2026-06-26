@@ -1,4 +1,4 @@
-using Azure.Identity;
+﻿using Azure.Identity;
 using Azure.Monitor.OpenTelemetry.AspNetCore;
 using Frontend.Components;
 using Frontend.Services;
@@ -9,7 +9,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 var credential = new DefaultAzureCredential();
 
-var kvUri = builder.Configuration["KeyVault:Uri"];
+var kvUri = builder.Configuration[$"KeyVault:Uri"];
 if (!string.IsNullOrEmpty(kvUri))
 {
     try
@@ -21,6 +21,7 @@ if (!string.IsNullOrEmpty(kvUri))
         Console.WriteLine($"Warning: Could not connect to Key Vault at {kvUri}. {ex.Message}");
     }
 }
+
 builder.Configuration.AddEnvironmentVariables();
 
 builder.Services.AddRazorComponents()
@@ -28,7 +29,7 @@ builder.Services.AddRazorComponents()
 
 builder.Services.AddHttpClient<ApiClient>(client =>
 {
-    var baseUrl = builder.Configuration["BackendApi:BaseUrl"] ?? "https://localhost:5001";
+    var baseUrl = builder.Configuration[$"BackendApi:BaseUrl"] ?? $"https://localhost:5001";
     client.BaseAddress = new Uri(baseUrl);
 }).AddHttpMessageHandler<LoggingDelegatingHandler>();
 
@@ -40,28 +41,32 @@ otel.WithTracing(t =>
     t.AddAspNetCoreInstrumentation();
     t.AddHttpClientInstrumentation();
     if (builder.Environment.IsDevelopment())
+    {
         t.AddConsoleExporter();
+    }
 });
 otel.WithMetrics(m =>
 {
     m.AddAspNetCoreInstrumentation();
-    m.AddMeter("MemoryOfX");
+    m.AddMeter($"MemoryOfX");
     if (builder.Environment.IsDevelopment())
+    {
         m.AddConsoleExporter();
+    }
 });
 
 if (!builder.Environment.IsDevelopment())
 {
     builder.Services.AddOpenTelemetry()
         .UseAzureMonitor(o =>
-            o.ConnectionString = builder.Configuration["ApplicationInsights:ConnectionString"]);
+            o.ConnectionString = builder.Configuration[$"ApplicationInsights:ConnectionString"]);
 }
 
 var app = builder.Build();
 
 if (!app.Environment.IsDevelopment())
 {
-    app.UseExceptionHandler("/Error", createScopeForErrors: true);
+    app.UseExceptionHandler($"/Error", createScopeForErrors: true);
     app.UseHsts();
 }
 

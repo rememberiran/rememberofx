@@ -11,22 +11,27 @@ public class GlobalExceptionHandler : IExceptionHandler
         _logger = logger;
     }
 
-    public async ValueTask<bool> TryHandleAsync(HttpContext context, Exception exception, CancellationToken ct)
+    public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
     {
-        var correlationId = context.Items["CorrelationId"]?.ToString();
+        var correlationId = httpContext.Items["CorrelationId"]?.ToString();
 
-        _logger.LogError(exception,
+        _logger.LogError(
+            exception,
             "Unhandled exception on {Method} {Path}. CorrelationId: {CorrelationId}",
-            context.Request.Method, context.Request.Path, correlationId);
+            httpContext.Request.Method,
+            httpContext.Request.Path,
+            correlationId);
 
-        context.Response.StatusCode = 500;
-        context.Response.ContentType = "application/json";
-        await context.Response.WriteAsJsonAsync(new
-        {
-            error = "INTERNAL_ERROR",
-            message = "An unexpected error occurred.",
-            correlationId
-        }, ct);
+        httpContext.Response.StatusCode = 500;
+        httpContext.Response.ContentType = "application/json";
+        await httpContext.Response.WriteAsJsonAsync(
+            new
+            {
+                error = "INTERNAL_ERROR",
+                message = "An unexpected error occurred.",
+                correlationId,
+            },
+            cancellationToken);
 
         return true;
     }

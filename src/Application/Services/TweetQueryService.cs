@@ -1,4 +1,4 @@
-using Application.Interfaces;
+﻿using Application.Interfaces;
 using Application.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -23,7 +23,9 @@ public class TweetQueryService : ITweetQueryService
     {
         var tweet = await _db.Tweets.FirstOrDefaultAsync(t => t.Id == id, ct);
         if (tweet is null)
-            return Result.Failure<TweetDto>(DomainError.NotFound("Tweet not found"));
+        {
+            return Result.Failure<TweetDto>(DomainError.NotFound($"Tweet not found"));
+        }
 
         var profile = tweet.AuthorXUserId != null
             ? await _db.XUserProfiles.FirstOrDefaultAsync(p => p.XUserId == tweet.AuthorXUserId, ct)
@@ -36,13 +38,15 @@ public class TweetQueryService : ITweetQueryService
     {
         var tweet = await _db.Tweets.FirstOrDefaultAsync(t => t.Id == id, ct);
         if (tweet is null)
-            return Result.Failure<TweetStatusDto>(DomainError.NotFound("Tweet not found"));
+        {
+            return Result.Failure<TweetStatusDto>(DomainError.NotFound($"Tweet not found"));
+        }
 
         object? tweetData = tweet.FetchStatus switch
         {
             "Ok" => MapToDto(tweet, await LoadAuthorProfile(tweet.AuthorXUserId, ct)),
-            "NotFound" or "Private" or "ScrapeFailed" => new { fetchStatus = tweet.FetchStatus, xTweetUrl = tweet.XTweetUrl },
-            _ => null
+            $"NotFound" or $"Private" or $"ScrapeFailed" => new { fetchStatus = tweet.FetchStatus, xTweetUrl = tweet.XTweetUrl },
+            _ => null,
         };
 
         return Result.Success(new TweetStatusDto(tweet.Id, tweet.FetchStatus, tweetData));
@@ -53,14 +57,14 @@ public class TweetQueryService : ITweetQueryService
         if (string.IsNullOrWhiteSpace(query.Q) && string.IsNullOrWhiteSpace(query.Tag) &&
             string.IsNullOrWhiteSpace(query.Username) && string.IsNullOrWhiteSpace(query.UserId))
         {
-            return Result.Failure<SearchTweetsResult>(DomainError.Validation("At least one search parameter (q, tag, username, userId) is required"));
+            return Result.Failure<SearchTweetsResult>(DomainError.Validation($"At least one search parameter (q, tag, username, userId) is required"));
         }
 
         IQueryable<TweetRecord> tweets;
 
         if (!string.IsNullOrWhiteSpace(query.Q))
         {
-            var searchTerm = $"\"{query.Q}\"";
+            var searchTerm = "\"{query.Q}\"";
             tweets = _db.Tweets.FromSqlRaw(
                 "SELECT DISTINCT t.* FROM Tweets t " +
                 "LEFT JOIN XUserProfiles p ON t.AuthorXUserId = p.XUserId " +
@@ -75,7 +79,7 @@ public class TweetQueryService : ITweetQueryService
 
         if (!string.IsNullOrWhiteSpace(query.Tag))
         {
-            var tagSearch = $"\"{query.Tag}\"";
+            var tagSearch = "\"{query.Tag}\"";
             tweets = tweets.Where(t => t.Tags != null && t.Tags.Contains(tagSearch));
         }
 
@@ -92,7 +96,7 @@ public class TweetQueryService : ITweetQueryService
 
         var totalCount = await tweets.CountAsync(ct);
 
-        var sorted = query.Sort == "date"
+        var sorted = string.Equals(query.Sort, $"date", StringComparison.Ordinal)
             ? tweets.OrderByDescending(t => t.CreatedAt)
             : tweets.OrderByDescending(t => t.VoteCount).ThenByDescending(t => t.CreatedAt);
 
@@ -104,23 +108,25 @@ public class TweetQueryService : ITweetQueryService
         var authorIds = page
             .Where(t => t.AuthorXUserId != null)
             .Select(t => t.AuthorXUserId!)
-            .Distinct()
+            .Distinct(StringComparer.Ordinal)
             .ToList();
 
         var profiles = authorIds.Count > 0
             ? await _db.XUserProfiles
                 .Where(p => authorIds.Contains(p.XUserId))
                 .ToDictionaryAsync(p => p.XUserId, ct)
-            : new Dictionary<string, XUserProfileRecord>();
+            : new Dictionary<string, XUserProfileRecord>(StringComparer.Ordinal);
 
-        var items = page.Select(t => MapToDto(t, profiles.GetValueOrDefault(t.AuthorXUserId ?? ""))).ToList();
+        var items = page.Select(t => MapToDto(t, profiles.GetValueOrDefault(t.AuthorXUserId ?? string.Empty))).ToList();
 
         XUserProfileDto? subjectProfile = null;
         if (!string.IsNullOrWhiteSpace(query.UserId))
         {
             var profile = await _db.XUserProfiles.FirstOrDefaultAsync(p => p.XUserId == query.UserId, ct);
             if (profile != null)
+            {
                 subjectProfile = MapProfileToDto(profile);
+            }
         }
 
         _logger.LogInformation("Search completed: {TotalCount} results for query {Query}", totalCount, query);
@@ -130,7 +136,11 @@ public class TweetQueryService : ITweetQueryService
 
     private async Task<XUserProfileRecord?> LoadAuthorProfile(string? authorXUserId, CancellationToken ct)
     {
-        if (authorXUserId is null) return null;
+        if (authorXUserId is null)
+        {
+            return null;
+        }
+
         return await _db.XUserProfiles.FirstOrDefaultAsync(p => p.XUserId == authorXUserId, ct);
     }
 

@@ -1,6 +1,8 @@
+﻿using Application.Models;
+
 namespace Application.Interfaces;
 
 public interface IAuthService
 {
-    Task<Result<string>> VerifyAndGenerateTokenAsync(string xUserId, CancellationToken ct);
+    Task<Result<AuthTokenResult>> ExchangeTokenAsync(string xAccessToken, string ipAddress, CancellationToken ct);
 }

@@ -78,7 +78,8 @@ ENTRYPOINT ["dotnet", "Worker.dll"]
 All three apps share the same Container Apps Environment (`cae-mox-prod`).
 
 ### Backend (`ca-mox-api-prod`)
-- Ingress: **internal** — not reachable from the internet
+- Ingress: **internal** — not reachable from the public internet. Only accessible by other apps within the same Container Apps Environment (`cae-mox-prod`) via internal DNS (`http://ca-mox-api-prod`). The Frontend and Worker are the only callers.
+- No API keys or mTLS between Frontend and Backend — ACA internal ingress provides network-level isolation. The user's application JWT (issued by the Backend) is forwarded by the Frontend on protected calls.
 - CPU: 0.5 vCPU, Memory: 1Gi
 - Min replicas: 0, Max replicas: 3
 - Scale rule: HTTP — 50 concurrent requests per replica
@@ -143,6 +144,7 @@ User-delegation SAS uses Entra ID credentials, not storage account keys — so U
 
 | Requirement | Implementation |
 |---|---|
+| Network isolation | Backend API uses ACA internal ingress — only reachable by Frontend and Worker within the same environment |
 | HTTPS | ACA automatic TLS on public ingress; local dev cert |
 | No hard-coded secrets | Key Vault + `DefaultAzureCredential`; User Secrets locally |
 | SQL injection | EF Core parameterized queries — no raw SQL |
@@ -152,6 +154,7 @@ User-delegation SAS uses Entra ID credentials, not storage account keys — so U
 | Screenshot blobs | Private container; short-lived user-delegation SAS URLs (1h) |
 | Auth token | HttpOnly cookie, `SameSite=Strict`, 8h TTL |
 | JWT validation | Backend checks JWT on every protected request + verifies `IsActive` in `Users` table |
+| Auth token exchange | Frontend sends X access token to Backend; Backend validates with X API and issues application JWT — Frontend never resolves identity |
 
 ### Content Security Policy (Frontend, production only)
 
@@ -373,7 +376,7 @@ Build in this order to minimize blocked dependencies. Each step should be commit
 1. **Database** — EF Core entities (`FetchStatus` enum, `Tweets` nullable columns, `Folders.ParentFolderId` self-reference, `XUserProfiles` table), `AppDbContext`, all migrations, `DatabaseSeeder`
 2. **Infrastructure: Queue** — `ScrapeQueueService`, `ScrapeJobMessage` DTO
 3. **Backend: Foundation** — project setup, `DefaultAzureCredential` config chain, `CorrelationIdMiddleware`, `HttpLoggingMiddleware` (request/response logging + `http.server.request` histogram), `LoadSheddingMiddleware`, OTel, health checks (`/health/live`, `/health/ready`), DI wiring, CORS (dev only)
-4. **Backend: Auth endpoint** — JWT generation (HS256), user lookup, `IsActive` check, `GET /api/auth/verify`
+4. **Backend: Auth endpoint** — `POST /api/auth/token` — validates X access token via X API (`/2/users/me`), user lookup, `IsActive` check, JWT generation (HS256)
 5. **Backend: Tweet submission** — URL parse (`XTweetId` + `AuthorXUsername`), dedup check, stub `Tweet` insert, `XUserProfiles` stub auto-create (upsert), `FolderTweet` insert, `AuditLog`, queue enqueue; return `202 Accepted`
 6. **Backend: Status polling** — `GET /api/tweets/{id}/status`
 7. **Backend: Search** — full-text + username + userId, `XUserProfile` join, AND logic, pagination, sorting

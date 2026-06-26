@@ -1,4 +1,4 @@
-using Application.Interfaces;
+﻿using Application.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Storage;
@@ -20,14 +20,18 @@ public class VoteService : IVoteService
     {
         var tweet = await _db.Tweets.FirstOrDefaultAsync(t => t.Id == tweetId, ct);
         if (tweet is null)
-            return Result.Failure(DomainError.NotFound("Tweet not found"));
+        {
+            return Result.Failure(DomainError.NotFound($"Tweet not found"));
+        }
 
         if (voterUserId.HasValue)
         {
             var existingByUser = await _db.Votes
                 .AnyAsync(v => v.TweetId == tweetId && v.VoterUserId == voterUserId, ct);
             if (existingByUser)
-                return Result.Failure(DomainError.Conflict("Already voted"));
+            {
+                return Result.Failure(DomainError.Conflict($"Already voted"));
+            }
 
             // Auth overrides anonymous: if same user voted anonymously from same IP, don't increment
             var anonymousVoteFromSameIp = await _db.Votes
@@ -40,7 +44,7 @@ public class VoteService : IVoteService
                     Id = Guid.NewGuid(),
                     TweetId = tweetId,
                     VoterIp = voterIp,
-                    VoterUserId = voterUserId
+                    VoterUserId = voterUserId,
                 });
                 await _db.SaveChangesAsync(ct);
 
@@ -53,7 +57,9 @@ public class VoteService : IVoteService
             var existingByIp = await _db.Votes
                 .AnyAsync(v => v.TweetId == tweetId && v.VoterIp == voterIp, ct);
             if (existingByIp)
-                return Result.Failure(DomainError.Conflict("Already voted"));
+            {
+                return Result.Failure(DomainError.Conflict($"Already voted"));
+            }
         }
 
         _db.Votes.Add(new VoteRecord
@@ -61,11 +67,11 @@ public class VoteService : IVoteService
             Id = Guid.NewGuid(),
             TweetId = tweetId,
             VoterIp = voterIp,
-            VoterUserId = voterUserId
+            VoterUserId = voterUserId,
         });
 
         await _db.Database.ExecuteSqlRawAsync(
-            "UPDATE Tweets SET VoteCount = VoteCount + 1 WHERE Id = {0}", tweetId, ct);
+$"UPDATE Tweets SET VoteCount = VoteCount + 1 WHERE Id = {0}", tweetId, ct);
 
         await _db.SaveChangesAsync(ct);
 

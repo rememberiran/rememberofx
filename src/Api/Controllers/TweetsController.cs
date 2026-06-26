@@ -1,4 +1,4 @@
-using Api.Extensions;
+﻿using Api.Extensions;
 using Api.Models.Requests;
 using Application.Interfaces;
 using Application.Models;
@@ -48,7 +48,7 @@ public class TweetsController : ControllerBase
         [FromQuery] string? tag,
         [FromQuery] string? username,
         [FromQuery] string? userId,
-        [FromQuery] string sort = "votes",
+        [FromQuery] string sort = $"votes",
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
         CancellationToken ct = default)
@@ -57,7 +57,9 @@ public class TweetsController : ControllerBase
         var result = await _queryService.SearchAsync(query, ct);
 
         if (!result.IsSuccess)
+        {
             return result.ToActionResult();
+        }
 
         var data = result.Value!;
         return Ok(new { items = data.Items, totalCount = data.TotalCount, subjectProfile = data.SubjectProfile });

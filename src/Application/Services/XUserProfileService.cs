@@ -1,4 +1,4 @@
-using Application.Interfaces;
+﻿using Application.Interfaces;
 using Application.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -21,7 +21,9 @@ public class XUserProfileService : IXUserProfileService
     {
         var profile = await _db.XUserProfiles.FirstOrDefaultAsync(p => p.XUserId == xUserId, ct);
         if (profile is null)
-            return Result.Failure<XUserProfileDto>(DomainError.NotFound("X user profile not found"));
+        {
+            return Result.Failure<XUserProfileDto>(DomainError.NotFound($"X user profile not found"));
+        }
 
         return Result.Success(MapToDto(profile));
     }
@@ -29,7 +31,9 @@ public class XUserProfileService : IXUserProfileService
     public async Task<Result<XUserProfileDto>> UpsertAsync(string xUserId, string? customName, string? description, Guid? updatedByUserId, CancellationToken ct)
     {
         if (customName is null && description is null)
-            return Result.Failure<XUserProfileDto>(DomainError.Validation("At least one field (customName or description) is required"));
+        {
+            return Result.Failure<XUserProfileDto>(DomainError.Validation($"At least one field (customName or description) is required"));
+        }
 
         var profile = await _db.XUserProfiles.FirstOrDefaultAsync(p => p.XUserId == xUserId, ct);
 
@@ -41,15 +45,23 @@ public class XUserProfileService : IXUserProfileService
                 XUserId = xUserId,
                 CustomName = customName,
                 Description = description,
-                CreatedByUserId = updatedByUserId
+                CreatedByUserId = updatedByUserId,
             };
             _db.XUserProfiles.Add(profile);
             _logger.LogInformation("XUserProfile created for {XUserId}", xUserId);
         }
         else
         {
-            if (customName != null) profile.CustomName = customName;
-            if (description != null) profile.Description = description;
+            if (customName != null)
+            {
+                profile.CustomName = customName;
+            }
+
+            if (description != null)
+            {
+                profile.Description = description;
+            }
+
             profile.UpdatedByUserId = updatedByUserId;
             profile.UpdatedAt = DateTime.UtcNow;
             _logger.LogInformation("XUserProfile updated for {XUserId}", xUserId);

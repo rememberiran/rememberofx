@@ -1,3 +1,6 @@
+﻿using Application;
+using Application.Models;
+
 namespace Api.Middleware;
 
 public class CorrelationIdMiddleware
@@ -11,15 +14,17 @@ public class CorrelationIdMiddleware
         _logger = logger;
     }
 
-    public async Task InvokeAsync(HttpContext context)
+    public async Task InvokeAsync(HttpContext context, IAsyncContext<CorrelationContext> correlationContext)
     {
-        var correlationId = context.Request.Headers["X-Correlation-ID"].FirstOrDefault()
+        var correlationId = context.Request.Headers[$"X-Correlation-ID"].FirstOrDefault()
                             ?? Guid.NewGuid().ToString();
 
-        context.Items["CorrelationId"] = correlationId;
-        context.Response.Headers["X-Correlation-ID"] = correlationId;
+        correlationContext.Value = new CorrelationContext { CorrelationId = correlationId };
 
-        using (_logger.BeginScope(new Dictionary<string, object> { ["CorrelationId"] = correlationId }))
+        context.Items[$"CorrelationId"] = correlationId;
+        context.Response.Headers[$"X-Correlation-ID"] = correlationId;
+
+        using (_logger.BeginScope(new Dictionary<string, object>(StringComparer.Ordinal) { [$"CorrelationId"] = correlationId }))
         {
             await _next(context);
         }

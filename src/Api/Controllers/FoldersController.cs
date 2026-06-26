@@ -1,4 +1,4 @@
-using Api.Extensions;
+﻿using Api.Extensions;
 using Api.Models.Requests;
 using Application.Interfaces;
 using Microsoft.AspNetCore.Mvc;
@@ -42,7 +42,7 @@ public class FoldersController : ControllerBase
     [HttpGet("{id:guid}/tweets")]
     public async Task<IActionResult> GetTweets(
         Guid id,
-        [FromQuery] string sort = "votes",
+        [FromQuery] string sort = $"votes",
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
         CancellationToken ct = default)
@@ -50,7 +50,9 @@ public class FoldersController : ControllerBase
         var result = await _folderService.GetTweetsAsync(id, sort, page, pageSize, ct);
 
         if (!result.IsSuccess)
+        {
             return result.ToActionResult();
+        }
 
         var data = result.Value!;
         return Ok(new { items = data.Items, totalCount = data.TotalCount });
@@ -61,13 +63,15 @@ public class FoldersController : ControllerBase
     {
         var userId = await ResolveUserIdAsync(ct);
         if (userId is null)
+        {
             return Unauthorized();
+        }
 
         var result = await _folderService.CreateAsync(
             request.Name, request.Description, request.ParentFolderId, userId.Value, ct);
 
         return result.IsSuccess
-            ? Created($"/api/folders/{result.Value!.Id}", result.Value)
+            ? Created(new Uri($"/api/folders/{result.Value!.Id}", UriKind.Relative), result.Value)
             : result.ToActionResult();
     }
 
@@ -83,7 +87,9 @@ public class FoldersController : ControllerBase
     {
         var userId = await ResolveUserIdAsync(ct);
         if (userId is null)
+        {
             return Unauthorized();
+        }
 
         var result = await _folderService.AddTweetAsync(folderId, tweetId, userId.Value, ct);
         return result.IsSuccess ? NoContent() : result.ToActionResult();
@@ -99,7 +105,10 @@ public class FoldersController : ControllerBase
     private async Task<Guid?> ResolveUserIdAsync(CancellationToken ct)
     {
         var xUserId = User.GetXUserId();
-        if (xUserId is null) return null;
+        if (xUserId is null)
+        {
+            return null;
+        }
 
         var userResult = await _userService.GetByXUserIdAsync(xUserId, ct);
         return userResult.IsSuccess ? userResult.Value!.Id : null;

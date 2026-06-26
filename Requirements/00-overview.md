@@ -70,11 +70,20 @@ The application has two environments with **completely separate Azure resource s
 
 - All three services are deployed as separate Docker containers on **Azure Container Apps (ACA)**, Consumption plan.
 - The Frontend has external HTTPS ingress (public). The Backend API has internal ingress only. The Worker has ingress disabled — it scales on Storage Queue depth.
+- **Network isolation:** The Backend API is not reachable from the public internet. ACA internal ingress restricts access to apps within the same Container Apps Environment (`cae-mox-prod`). Only the Frontend and Worker can reach the Backend — browsers never communicate with it directly.
 - ACA provides automatic TLS for the Frontend — **no Application Gateway needed.**
 - Secrets injected via ACA Key Vault secret references using Managed Identity.
-- No VNet required.
+- No VNet required — ACA internal ingress provides sufficient isolation for this architecture.
 
-### 4.3 CORS Configuration
+### 4.3 Network Isolation
+
+The Backend API is **internal-only** in production. It has no public endpoint and cannot be reached from the internet. Only the Frontend and Worker — running in the same ACA environment — can call it via ACA internal DNS (`http://ca-mox-api-prod`). This means:
+
+- No API keys or mTLS required between Frontend and Backend — network-level isolation is sufficient.
+- The user's JWT (issued by the Backend after X SSO token exchange) is forwarded by the Frontend on protected calls. Anonymous requests go through without a token.
+- CORS is disabled in production since no browser-originated requests reach the Backend.
+
+### 4.4 CORS Configuration
 
 CORS is only needed locally. In production the backend is internal-only and never receives browser requests directly.
 

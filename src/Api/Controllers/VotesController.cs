@@ -1,4 +1,4 @@
-using Api.Extensions;
+﻿using Api.Extensions;
 using Application.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 
@@ -26,13 +26,15 @@ public class VotesController : ControllerBase
         {
             var userResult = await _userService.GetByXUserIdAsync(xUserId, ct);
             if (userResult.IsSuccess)
+            {
                 voterUserId = userResult.Value!.Id;
+            }
         }
 
         var result = await _voteService.CastVoteAsync(tweetId, HttpContext.GetClientIp(), voterUserId, ct);
 
         return result.IsSuccess
-            ? Ok(new { message = "Vote recorded" })
+            ? Ok(new { message = $"Vote recorded" })
             : result.ToActionResult();
     }
 }

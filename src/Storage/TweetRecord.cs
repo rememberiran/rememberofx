@@ -1,4 +1,4 @@
-namespace Storage;
+﻿namespace Storage;
 
 public class TweetRecord
 {
@@ -12,7 +12,7 @@ public class TweetRecord
     public string? ScreenshotBlobName { get; set; }
     public string? Tags { get; set; }
     public int VoteCount { get; set; }
-    public string FetchStatus { get; set; } = "Pending";
+    public string FetchStatus { get; set; } = $"Pending";
     public int ScrapeAttempts { get; set; }
     public string? ScrapeError { get; set; }
     public Guid? SubmittedByUserId { get; set; }

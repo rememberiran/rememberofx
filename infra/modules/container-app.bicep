@@ -35,6 +35,9 @@ param envVars array = []
 @description('Scale rules')
 param scaleRules array = []
 
+@description('Allow insecure (HTTP) connections. Use for internal-only apps where TLS is unnecessary within the ACA environment.')
+param allowInsecure bool = false
+
 resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: appName
   location: location
@@ -48,6 +51,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
         external: ingressType == 'external'
         targetPort: targetPort
         transport: 'auto'
+        allowInsecure: allowInsecure
       }
     }
     template: {

@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.RegularExpressions;
 using Application.Interfaces;
 using Application.Models;
@@ -25,15 +25,17 @@ public partial class TweetSubmissionService : ITweetSubmissionService
     {
         var match = TweetUrlRegex().Match(command.TweetUrl);
         if (!match.Success)
+        {
             return Result.Failure<TweetSubmissionResult>(DomainError.Validation("Invalid tweet URL. Expected format: https://x.com/{username}/status/{id}"));
+        }
 
-        var authorXUsername = match.Groups[1].Value;
-        var xTweetId = match.Groups[2].Value;
+        var authorXUsername = match.Groups[$"username"].Value;
+        var xTweetId = match.Groups[$"id"].Value;
 
         var existing = await _db.Tweets.FirstOrDefaultAsync(t => t.XTweetId == xTweetId, ct);
         if (existing != null)
         {
-            return Result.Failure<TweetSubmissionResult>(DomainError.Conflict("Already submitted"));
+            return Result.Failure<TweetSubmissionResult>(DomainError.Conflict($"Already submitted"));
         }
 
         var correlationId = Guid.NewGuid().ToString();
@@ -46,18 +48,18 @@ public partial class TweetSubmissionService : ITweetSubmissionService
             authorXUsername,
             folderIds = command.FolderIds,
             submittedByUserId = command.SubmittedByUserId,
-            submittedByIp = command.SubmittedByIp
+            submittedByIp = command.SubmittedByIp,
         });
 
         _db.AuditLogs.Add(new AuditLogRecord
         {
             CorrelationId = correlationId,
-            Action = "Tweet.SubmitRequest",
-            EntityType = "Tweet",
+            Action = $"Tweet.SubmitRequest",
+            EntityType = $"Tweet",
             EntityId = xTweetId,
             PerformedByUserId = command.SubmittedByUserId,
             IpAddress = command.SubmittedByIp,
-            Payload = auditPayload
+            Payload = auditPayload,
         });
 
         _db.Tweets.Add(new TweetRecord
@@ -66,23 +68,25 @@ public partial class TweetSubmissionService : ITweetSubmissionService
             XTweetId = xTweetId,
             XTweetUrl = command.TweetUrl,
             AuthorXUsername = authorXUsername,
-            FetchStatus = "Pending",
+            FetchStatus = $"Pending",
             SubmittedByUserId = command.SubmittedByUserId,
-            SubmittedByIp = command.SubmittedByIp
+            SubmittedByIp = command.SubmittedByIp,
         });
 
         await _db.SaveChangesAsync(ct);
 
         try
         {
-            await _queue.EnqueueAsync(new ScrapeJobMessage(
-                XTweetUrl: command.TweetUrl,
-                XTweetId: xTweetId,
-                AuthorXUsername: authorXUsername,
-                FolderIds: command.FolderIds,
-                SubmittedByUserId: command.SubmittedByUserId,
-                SubmittedByIp: command.SubmittedByIp,
-                CorrelationId: correlationId), ct);
+            await _queue.EnqueueAsync(
+                new ScrapeJobMessage(
+                    XTweetUrl: command.TweetUrl,
+                    XTweetId: xTweetId,
+                    AuthorXUsername: authorXUsername,
+                    FolderIds: command.FolderIds,
+                    SubmittedByUserId: command.SubmittedByUserId,
+                    SubmittedByIp: command.SubmittedByIp,
+                    CorrelationId: correlationId),
+                ct);
         }
         catch (Exception ex)
         {
@@ -91,9 +95,9 @@ public partial class TweetSubmissionService : ITweetSubmissionService
 
         _logger.LogInformation("Tweet submitted: {TweetId}, XTweetId: {XTweetId}, CorrelationId: {CorrelationId}", tweetId, xTweetId, correlationId);
 
-        return Result.Success(new TweetSubmissionResult(tweetId, "Pending"));
+        return Result.Success(new TweetSubmissionResult(tweetId, $"Pending"));
     }
 
-    [GeneratedRegex(@"https?://(?:x|twitter)\.com/([^/]+)/status/(\d+)", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"https?://(?:x|twitter)\.com/(?<username>[^/]+)/status/(?<id>\d+)", RegexOptions.IgnoreCase | RegexOptions.ExplicitCapture, matchTimeoutMilliseconds: 1000)]
     private static partial Regex TweetUrlRegex();
 }

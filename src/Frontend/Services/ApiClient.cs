@@ -1,4 +1,4 @@
-namespace Frontend.Services;
+﻿namespace Frontend.Services;
 
 public class ApiClient
 {

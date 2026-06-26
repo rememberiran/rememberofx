@@ -1,4 +1,4 @@
-namespace Domain.Enums;
+﻿namespace Domain.Enums;
 
 public enum FetchStatus
 {
@@ -7,5 +7,5 @@ public enum FetchStatus
     Ok,
     NotFound,
     Private,
-    ScrapeFailed
+    ScrapeFailed,
 }

@@ -1,4 +1,4 @@
-using Api.Extensions;
+﻿using Api.Extensions;
 using Api.Models.Requests;
 using Application.Interfaces;
 using Microsoft.AspNetCore.Mvc;
@@ -32,13 +32,15 @@ public class AdminController : ControllerBase
         {
             var currentUser = await _userService.GetByXUserIdAsync(xUserId, ct);
             if (currentUser.IsSuccess)
+            {
                 createdByUserId = currentUser.Value!.Id;
+            }
         }
 
-        var result = await _userService.AddAsync(request.XUserId, request.XUsername, request.Role, createdByUserId, ct);
+        var result = await _userService.AddAsync(request.XUserId, request.Role, createdByUserId, ct);
 
         return result.IsSuccess
-            ? Created($"/api/admin/users/{result.Value!.Id}", result.Value)
+            ? Created(new Uri($"/api/admin/users/{result.Value!.Id}", UriKind.Relative), result.Value)
             : result.ToActionResult();
     }
 
