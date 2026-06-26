@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Storage;
 
@@ -14,5 +15,6 @@ public interface IAppDbContext
     DbSet<VoteRecord> Votes { get; }
     DbSet<AuditLogRecord> AuditLogs { get; }
     DatabaseFacade Database { get; }
+    ChangeTracker ChangeTracker { get; }
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

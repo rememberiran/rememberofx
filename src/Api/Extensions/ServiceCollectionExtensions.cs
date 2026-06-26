@@ -1,4 +1,5 @@
-﻿using Application;
+﻿using Api.Mappers;
+using Application;
 using Application.Interfaces;
 using Application.Models;
 using Application.Services;
@@ -17,8 +18,10 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IAsyncContext<CorrelationContext>, AsyncContext<CorrelationContext>>();
         services.AddSingleton<IAsyncContext<IdentityContext>, AsyncContext<IdentityContext>>();
 
-        services.AddDbContext<AppDbContext>(options =>
-            options.UseSqlServer(configuration.GetConnectionString($"Default")));
+        services.AddSingleton<QueryLoggingInterceptor>();
+        services.AddDbContext<AppDbContext>((sp, options) =>
+            options.UseSqlServer(configuration.GetConnectionString($"Default"))
+                   .AddInterceptors(sp.GetRequiredService<QueryLoggingInterceptor>()));
 
         services.AddScoped<IAppDbContext>(sp => sp.GetRequiredService<AppDbContext>());
 
@@ -27,6 +30,7 @@ public static class ServiceCollectionExtensions
 
         services.AddScoped<ITweetSubmissionService, TweetSubmissionService>();
         services.AddScoped<ITweetQueryService, TweetQueryService>();
+        services.AddScoped<ISearchService, SearchService>();
         services.AddScoped<IFolderService, FolderService>();
         services.AddScoped<IVoteService, VoteService>();
         services.AddScoped<IXUserProfileService, XUserProfileService>();
@@ -37,6 +41,8 @@ public static class ServiceCollectionExtensions
 
         services.AddSingleton<IScrapeQueueService, ScrapeQueueService>();
         services.AddSingleton<IBlobStorageService, BlobStorageService>();
+
+        services.AddSingleton<TweetDtoMapper>();
 
         return services;
     }

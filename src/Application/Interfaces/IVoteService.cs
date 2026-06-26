@@ -2,5 +2,5 @@
 
 public interface IVoteService
 {
-    Task<Result> CastVoteAsync(Guid tweetId, string voterIp, Guid? voterUserId, CancellationToken ct);
+    Task<Result> CastVoteAsync(Guid tweetId, Guid? voterUserId, CancellationToken ct);
 }

@@ -1,5 +1,6 @@
-﻿using Application.Interfaces;
-using Application.Models;
+using Application.Interfaces;
+using Domain.Entities;
+using Domain.Mappers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Storage;
@@ -17,22 +18,22 @@ public class XUserProfileService : IXUserProfileService
         _logger = logger;
     }
 
-    public async Task<Result<XUserProfileDto>> GetByXUserIdAsync(string xUserId, CancellationToken ct)
+    public async Task<Result<XUserProfile>> GetByXUserIdAsync(string xUserId, CancellationToken ct)
     {
-        var profile = await _db.XUserProfiles.FirstOrDefaultAsync(p => p.XUserId == xUserId, ct);
+        var profile = await _db.XUserProfiles.AsNoTracking().FirstOrDefaultAsync(p => p.XUserId == xUserId, ct);
         if (profile is null)
         {
-            return Result.Failure<XUserProfileDto>(DomainError.NotFound($"X user profile not found"));
+            return Result.Failure<XUserProfile>(DomainError.NotFound($"X user profile not found"));
         }
 
-        return Result.Success(MapToDto(profile));
+        return Result.Success(XUserProfileMapper.ToDomain(profile));
     }
 
-    public async Task<Result<XUserProfileDto>> UpsertAsync(string xUserId, string? customName, string? description, Guid? updatedByUserId, CancellationToken ct)
+    public async Task<Result<XUserProfile>> UpsertAsync(string xUserId, string? customName, string? description, Guid? updatedByUserId, CancellationToken ct)
     {
         if (customName is null && description is null)
         {
-            return Result.Failure<XUserProfileDto>(DomainError.Validation($"At least one field (customName or description) is required"));
+            return Result.Failure<XUserProfile>(DomainError.Validation($"At least one field (customName or description) is required"));
         }
 
         var profile = await _db.XUserProfiles.FirstOrDefaultAsync(p => p.XUserId == xUserId, ct);
@@ -67,13 +68,6 @@ public class XUserProfileService : IXUserProfileService
             _logger.LogInformation("XUserProfile updated for {XUserId}", xUserId);
         }
 
-        await _db.SaveChangesAsync(ct);
-
-        return Result.Success(MapToDto(profile));
-    }
-
-    private static XUserProfileDto MapToDto(XUserProfileRecord record)
-    {
-        return new XUserProfileDto(record.Id, record.XUserId, record.ScrapedUsername, record.CustomName, record.Description);
+        return Result.Success(XUserProfileMapper.ToDomain(profile));
     }
 }

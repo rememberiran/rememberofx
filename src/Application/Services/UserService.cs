@@ -1,5 +1,6 @@
-﻿using Application.Interfaces;
-using Application.Models;
+using Application.Interfaces;
+using Domain.Entities;
+using Domain.Mappers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Storage;
@@ -17,16 +18,14 @@ public class UserService : IUserService
         _logger = logger;
     }
 
-    public async Task<Result<List<UserDto>>> ListAllAsync(CancellationToken ct)
+    public async Task<Result<List<User>>> ListAllAsync(CancellationToken ct)
     {
-        var users = await _db.Users
-            .Select(u => new UserDto(u.Id, u.XUserId, u.XUsername, u.Role, u.IsActive, u.CreatedAt))
-            .ToListAsync(ct);
-
+        var records = await _db.Users.AsNoTracking().ToListAsync(ct);
+        var users = records.Select(r => UserMapper.ToDomain(r)).ToList();
         return Result.Success(users);
     }
 
-    public async Task<Result<UserDto>> GetByXUserIdAsync(string xUserId, CancellationToken ct)
+    public async Task<Result<User>> GetByXUserIdAsync(string xUserId, CancellationToken ct)
     {
         var user = await _db
             .Users
@@ -35,13 +34,13 @@ public class UserService : IUserService
 
         if (user is null)
         {
-            return Result.Failure<UserDto>(DomainError.NotFound($"User not found"));
+            return Result.Failure<User>(DomainError.NotFound("User not found"));
         }
 
-        return Result.Success(MapToDto(user));
+        return Result.Success(UserMapper.ToDomain(user));
     }
 
-    public async Task<Result<UserDto>> AddAsync(string xUserId, string role, Guid? createdByUserId, CancellationToken ct)
+    public async Task<Result<User>> AddAsync(string xUserId, string role, Guid? createdByUserId, CancellationToken ct)
     {
         var existing = await _db
             .Users
@@ -50,7 +49,7 @@ public class UserService : IUserService
 
         if (existing != null)
         {
-            return Result.Failure<UserDto>(DomainError.Conflict($"User with this X user ID already exists"));
+            return Result.Failure<User>(DomainError.Conflict("User with this X user ID already exists"));
         }
 
         var user = new UserRecord
@@ -62,19 +61,18 @@ public class UserService : IUserService
         };
 
         _db.Users.Add(user);
-        await _db.SaveChangesAsync(ct);
 
         _logger.LogInformation("User added: {UserId}, XUserId: {XUserId}, Role: {Role}", user.Id, xUserId, role);
 
-        return Result.Success(MapToDto(user));
+        return Result.Success(UserMapper.ToDomain(user));
     }
 
-    public async Task<Result<UserDto>> UpdateAsync(Guid id, string? role, bool? isActive, CancellationToken ct)
+    public async Task<Result<User>> UpdateAsync(Guid id, string? role, bool? isActive, CancellationToken ct)
     {
         var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == id, ct);
         if (user is null)
         {
-            return Result.Failure<UserDto>(DomainError.NotFound($"User not found"));
+            return Result.Failure<User>(DomainError.NotFound("User not found"));
         }
 
         if (role != null)
@@ -87,11 +85,9 @@ public class UserService : IUserService
             user.IsActive = isActive.Value;
         }
 
-        await _db.SaveChangesAsync(ct);
-
         _logger.LogInformation("User updated: {UserId}, Role: {Role}, IsActive: {IsActive}", id, user.Role, user.IsActive);
 
-        return Result.Success(MapToDto(user));
+        return Result.Success(UserMapper.ToDomain(user));
     }
 
     public async Task<Result> DeactivateAsync(Guid id, CancellationToken ct)
@@ -99,19 +95,13 @@ public class UserService : IUserService
         var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == id, ct);
         if (user is null)
         {
-            return Result.Failure(DomainError.NotFound($"User not found"));
+            return Result.Failure(DomainError.NotFound("User not found"));
         }
 
         user.IsActive = false;
-        await _db.SaveChangesAsync(ct);
 
         _logger.LogInformation("User deactivated: {UserId}", id);
 
         return Result.Success();
-    }
-
-    private static UserDto MapToDto(UserRecord record)
-    {
-        return new UserDto(record.Id, record.XUserId, record.XUsername, record.Role, record.IsActive, record.CreatedAt);
     }
 }

@@ -1,4 +1,5 @@
-﻿using Api.Extensions;
+using Api.Extensions;
+using Api.Mappers;
 using Api.Models.Requests;
 using Application.Interfaces;
 using Microsoft.AspNetCore.Mvc;
@@ -22,7 +23,14 @@ public class XUserProfilesController : ControllerBase
     public async Task<IActionResult> GetProfile(string xUserId, CancellationToken ct)
     {
         var result = await _profileService.GetByXUserIdAsync(xUserId, ct);
-        return result.ToActionResult();
+
+        if (!result.IsSuccess)
+        {
+            return result.ToActionResult();
+        }
+
+        var dto = XUserProfileDtoMapper.ToDto(result.Value!);
+        return Ok(dto);
     }
 
     [HttpPut("{xUserId}")]
@@ -40,6 +48,13 @@ public class XUserProfilesController : ControllerBase
         }
 
         var result = await _profileService.UpsertAsync(xUserId, request.CustomName, request.Description, userId, ct);
-        return result.ToActionResult();
+
+        if (!result.IsSuccess)
+        {
+            return result.ToActionResult();
+        }
+
+        var dto = XUserProfileDtoMapper.ToDto(result.Value!);
+        return Ok(dto);
     }
 }

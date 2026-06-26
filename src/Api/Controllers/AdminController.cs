@@ -1,4 +1,5 @@
-﻿using Api.Extensions;
+using Api.Extensions;
+using Api.Mappers;
 using Api.Models.Requests;
 using Application.Interfaces;
 using Microsoft.AspNetCore.Mvc;
@@ -20,7 +21,14 @@ public class AdminController : ControllerBase
     public async Task<IActionResult> ListUsers(CancellationToken ct)
     {
         var result = await _userService.ListAllAsync(ct);
-        return result.ToActionResult();
+
+        if (!result.IsSuccess)
+        {
+            return result.ToActionResult();
+        }
+
+        var dtos = result.Value!.Select(UserDtoMapper.ToDto).ToList();
+        return Ok(dtos);
     }
 
     [HttpPost("users")]
@@ -39,16 +47,27 @@ public class AdminController : ControllerBase
 
         var result = await _userService.AddAsync(request.XUserId, request.Role, createdByUserId, ct);
 
-        return result.IsSuccess
-            ? Created(new Uri($"/api/admin/users/{result.Value!.Id}", UriKind.Relative), result.Value)
-            : result.ToActionResult();
+        if (!result.IsSuccess)
+        {
+            return result.ToActionResult();
+        }
+
+        var dto = UserDtoMapper.ToDto(result.Value!);
+        return Created(new Uri($"/api/admin/users/{result.Value!.Id}", UriKind.Relative), dto);
     }
 
     [HttpPut("users/{id:guid}")]
     public async Task<IActionResult> UpdateUser(Guid id, [FromBody] UpdateUserRequest request, CancellationToken ct)
     {
         var result = await _userService.UpdateAsync(id, request.Role, request.IsActive, ct);
-        return result.ToActionResult();
+
+        if (!result.IsSuccess)
+        {
+            return result.ToActionResult();
+        }
+
+        var dto = UserDtoMapper.ToDto(result.Value!);
+        return Ok(dto);
     }
 
     [HttpDelete("users/{id:guid}")]

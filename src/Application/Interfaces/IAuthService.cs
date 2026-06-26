@@ -4,5 +4,5 @@ namespace Application.Interfaces;
 
 public interface IAuthService
 {
-    Task<Result<AuthTokenResult>> ExchangeTokenAsync(string xAccessToken, string ipAddress, CancellationToken ct);
+    Task<Result<AuthTokenResult>> ExchangeTokenAsync(string xAccessToken, CancellationToken ct);
 }

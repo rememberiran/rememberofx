@@ -1,10 +1,9 @@
-﻿using Application.Models;
+using Application.Models;
+using Domain.Entities;
 
 namespace Application.Interfaces;
 
 public interface ITweetSubmissionService
 {
-    Task<Result<TweetSubmissionResult>> SubmitAsync(SubmitTweetCommand command, CancellationToken ct);
+    Task<Result<Tweet>> SubmitAsync(SubmitTweetCommand command, CancellationToken ct);
 }
-
-public record TweetSubmissionResult(Guid TweetId, string FetchStatus);

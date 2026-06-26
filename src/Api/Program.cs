@@ -109,6 +109,7 @@ if (app.Environment.IsDevelopment())
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseMiddleware<IdentityMiddleware>();
+app.UseMiddleware<UnitOfWorkMiddleware>();
 app.MapControllers();
 
 app.Run();

@@ -1,7 +1,9 @@
-﻿using Api.Extensions;
+using Api.Extensions;
+using Api.Mappers;
 using Api.Models.Requests;
 using Application.Interfaces;
 using Application.Models;
+using Domain.Enums;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Api.Controllers;
@@ -12,11 +14,16 @@ public class TweetsController : ControllerBase
 {
     private readonly ITweetSubmissionService _submissionService;
     private readonly ITweetQueryService _queryService;
+    private readonly TweetDtoMapper _tweetDtoMapper;
 
-    public TweetsController(ITweetSubmissionService submissionService, ITweetQueryService queryService)
+    public TweetsController(
+        ITweetSubmissionService submissionService,
+        ITweetQueryService queryService,
+        TweetDtoMapper tweetDtoMapper)
     {
         _submissionService = submissionService;
         _queryService = queryService;
+        _tweetDtoMapper = tweetDtoMapper;
     }
 
     [HttpPost]
@@ -25,50 +32,63 @@ public class TweetsController : ControllerBase
         var command = new SubmitTweetCommand(
             TweetUrl: request.TweetUrl,
             FolderIds: request.FolderIds,
-            SubmittedByIp: HttpContext.GetClientIp(),
             SubmittedByUserId: null);
 
         var result = await _submissionService.SubmitAsync(command, ct);
-
-        return result.IsSuccess
-            ? Accepted(new { tweetId = result.Value!.TweetId, fetchStatus = result.Value.FetchStatus })
-            : result.ToActionResult();
-    }
-
-    [HttpGet("{id:guid}/status")]
-    public async Task<IActionResult> GetStatus(Guid id, CancellationToken ct)
-    {
-        var result = await _queryService.GetStatusAsync(id, ct);
-        return result.ToActionResult();
-    }
-
-    [HttpGet("search")]
-    public async Task<IActionResult> Search(
-        [FromQuery] string? q,
-        [FromQuery] string? tag,
-        [FromQuery] string? username,
-        [FromQuery] string? userId,
-        [FromQuery] string sort = $"votes",
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 20,
-        CancellationToken ct = default)
-    {
-        var query = new SearchTweetsQuery(q, tag, username, userId, sort, page, pageSize);
-        var result = await _queryService.SearchAsync(query, ct);
 
         if (!result.IsSuccess)
         {
             return result.ToActionResult();
         }
 
-        var data = result.Value!;
-        return Ok(new { items = data.Items, totalCount = data.TotalCount, subjectProfile = data.SubjectProfile });
+        return Accepted(new
+        {
+            tweetId = result.Value!.Id,
+            fetchStatus = result.Value.FetchStatus.ToString(),
+        });
+    }
+
+    [HttpGet("{id:guid}/status")]
+    public async Task<IActionResult> GetStatus(Guid id, CancellationToken ct)
+    {
+        var result = await _queryService.GetStatusAsync(id, ct);
+
+        if (!result.IsSuccess)
+        {
+            return result.ToActionResult();
+        }
+
+        var tweet = result.Value!;
+        object? tweetData = tweet.FetchStatus switch
+        {
+            FetchStatus.Ok => _tweetDtoMapper.ToDto(tweet),
+            FetchStatus.NotFound or FetchStatus.Private or FetchStatus.ScrapeFailed => new
+            {
+                fetchStatus = tweet.FetchStatus.ToString(),
+                xTweetUrl = tweet.XTweetUrl,
+            },
+            _ => null,
+        };
+
+        return Ok(new
+        {
+            tweetId = tweet.Id,
+            fetchStatus = tweet.FetchStatus.ToString(),
+            tweetData,
+        });
     }
 
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetById(Guid id, CancellationToken ct)
     {
         var result = await _queryService.GetByIdAsync(id, ct);
-        return result.ToActionResult();
+
+        if (!result.IsSuccess)
+        {
+            return result.ToActionResult();
+        }
+
+        var dto = _tweetDtoMapper.ToDto(result.Value!);
+        return Ok(dto);
     }
 }

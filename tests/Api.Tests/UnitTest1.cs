@@ -27,6 +27,7 @@ public class HealthEndpointTests
         public Microsoft.EntityFrameworkCore.DbSet<Storage.VoteRecord> Votes => throw new NotSupportedException();
         public Microsoft.EntityFrameworkCore.DbSet<Storage.AuditLogRecord> AuditLogs => throw new NotSupportedException();
         public Microsoft.EntityFrameworkCore.Infrastructure.DatabaseFacade Database => throw new NotSupportedException();
+        public Microsoft.EntityFrameworkCore.ChangeTracking.ChangeTracker ChangeTracker => throw new NotSupportedException();
         public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }
 

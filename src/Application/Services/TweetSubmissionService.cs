@@ -1,7 +1,9 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using Application.Interfaces;
 using Application.Models;
+using Domain.Entities;
+using Domain.Mappers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Storage;
@@ -12,34 +14,41 @@ public partial class TweetSubmissionService : ITweetSubmissionService
 {
     private readonly IAppDbContext _db;
     private readonly IScrapeQueueService _queue;
+    private readonly IAsyncContext<IdentityContext> _identityContext;
     private readonly ILogger<TweetSubmissionService> _logger;
 
-    public TweetSubmissionService(IAppDbContext db, IScrapeQueueService queue, ILogger<TweetSubmissionService> logger)
+    public TweetSubmissionService(
+        IAppDbContext db,
+        IScrapeQueueService queue,
+        IAsyncContext<IdentityContext> identityContext,
+        ILogger<TweetSubmissionService> logger)
     {
         _db = db;
         _queue = queue;
+        _identityContext = identityContext;
         _logger = logger;
     }
 
-    public async Task<Result<TweetSubmissionResult>> SubmitAsync(SubmitTweetCommand command, CancellationToken ct)
+    public async Task<Result<Tweet>> SubmitAsync(SubmitTweetCommand command, CancellationToken ct)
     {
         var match = TweetUrlRegex().Match(command.TweetUrl);
         if (!match.Success)
         {
-            return Result.Failure<TweetSubmissionResult>(DomainError.Validation("Invalid tweet URL. Expected format: https://x.com/{username}/status/{id}"));
+            return Result.Failure<Tweet>(DomainError.Validation("Invalid tweet URL. Expected format: https://x.com/{username}/status/{id}"));
         }
 
         var authorXUsername = match.Groups[$"username"].Value;
         var xTweetId = match.Groups[$"id"].Value;
 
-        var existing = await _db.Tweets.FirstOrDefaultAsync(t => t.XTweetId == xTweetId, ct);
+        var existing = await _db.Tweets.AsNoTracking().FirstOrDefaultAsync(t => t.XTweetId == xTweetId, ct);
         if (existing != null)
         {
-            return Result.Failure<TweetSubmissionResult>(DomainError.Conflict($"Already submitted"));
+            return Result.Failure<Tweet>(DomainError.Conflict($"Already submitted"));
         }
 
         var correlationId = Guid.NewGuid().ToString();
         var tweetId = Guid.NewGuid();
+        var ipAddress = _identityContext.Value!.IpAddress;
 
         var auditPayload = JsonSerializer.Serialize(new
         {
@@ -48,7 +57,7 @@ public partial class TweetSubmissionService : ITweetSubmissionService
             authorXUsername,
             folderIds = command.FolderIds,
             submittedByUserId = command.SubmittedByUserId,
-            submittedByIp = command.SubmittedByIp,
+            submittedByIp = ipAddress,
         });
 
         _db.AuditLogs.Add(new AuditLogRecord
@@ -58,11 +67,11 @@ public partial class TweetSubmissionService : ITweetSubmissionService
             EntityType = $"Tweet",
             EntityId = xTweetId,
             PerformedByUserId = command.SubmittedByUserId,
-            IpAddress = command.SubmittedByIp,
+            IpAddress = ipAddress,
             Payload = auditPayload,
         });
 
-        _db.Tweets.Add(new TweetRecord
+        var tweetRecord = new TweetRecord
         {
             Id = tweetId,
             XTweetId = xTweetId,
@@ -70,9 +79,12 @@ public partial class TweetSubmissionService : ITweetSubmissionService
             AuthorXUsername = authorXUsername,
             FetchStatus = $"Pending",
             SubmittedByUserId = command.SubmittedByUserId,
-            SubmittedByIp = command.SubmittedByIp,
-        });
+            SubmittedByIp = ipAddress,
+        };
 
+        _db.Tweets.Add(tweetRecord);
+
+        // Explicit save required: the scrape queue message below depends on the tweet being persisted.
         await _db.SaveChangesAsync(ct);
 
         try
@@ -84,7 +96,7 @@ public partial class TweetSubmissionService : ITweetSubmissionService
                     AuthorXUsername: authorXUsername,
                     FolderIds: command.FolderIds,
                     SubmittedByUserId: command.SubmittedByUserId,
-                    SubmittedByIp: command.SubmittedByIp,
+                    SubmittedByIp: ipAddress,
                     CorrelationId: correlationId),
                 ct);
         }
@@ -95,7 +107,7 @@ public partial class TweetSubmissionService : ITweetSubmissionService
 
         _logger.LogInformation("Tweet submitted: {TweetId}, XTweetId: {XTweetId}, CorrelationId: {CorrelationId}", tweetId, xTweetId, correlationId);
 
-        return Result.Success(new TweetSubmissionResult(tweetId, $"Pending"));
+        return Result.Success(TweetMapper.ToDomain(tweetRecord));
     }
 
     [GeneratedRegex(@"https?://(?:x|twitter)\.com/(?<username>[^/]+)/status/(?<id>\d+)", RegexOptions.IgnoreCase | RegexOptions.ExplicitCapture, matchTimeoutMilliseconds: 1000)]

@@ -31,7 +31,7 @@ public class VotesController : ControllerBase
             }
         }
 
-        var result = await _voteService.CastVoteAsync(tweetId, HttpContext.GetClientIp(), voterUserId, ct);
+        var result = await _voteService.CastVoteAsync(tweetId, voterUserId, ct);
 
         return result.IsSuccess
             ? Ok(new { message = $"Vote recorded" })

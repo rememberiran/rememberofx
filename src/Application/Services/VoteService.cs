@@ -1,4 +1,5 @@
 ﻿using Application.Interfaces;
+using Application.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Storage;
@@ -8,17 +9,20 @@ namespace Application.Services;
 public class VoteService : IVoteService
 {
     private readonly IAppDbContext _db;
+    private readonly IAsyncContext<IdentityContext> _identityContext;
     private readonly ILogger<VoteService> _logger;
 
-    public VoteService(IAppDbContext db, ILogger<VoteService> logger)
+    public VoteService(IAppDbContext db, IAsyncContext<IdentityContext> identityContext, ILogger<VoteService> logger)
     {
         _db = db;
+        _identityContext = identityContext;
         _logger = logger;
     }
 
-    public async Task<Result> CastVoteAsync(Guid tweetId, string voterIp, Guid? voterUserId, CancellationToken ct)
+    public async Task<Result> CastVoteAsync(Guid tweetId, Guid? voterUserId, CancellationToken ct)
     {
-        var tweet = await _db.Tweets.FirstOrDefaultAsync(t => t.Id == tweetId, ct);
+        var voterIp = _identityContext.Value!.IpAddress;
+        var tweet = await _db.Tweets.AsNoTracking().FirstOrDefaultAsync(t => t.Id == tweetId, ct);
         if (tweet is null)
         {
             return Result.Failure(DomainError.NotFound($"Tweet not found"));
@@ -46,7 +50,6 @@ public class VoteService : IVoteService
                     VoterIp = voterIp,
                     VoterUserId = voterUserId,
                 });
-                await _db.SaveChangesAsync(ct);
 
                 _logger.LogInformation("Authenticated vote recorded for tweet {TweetId} by user {UserId} (count not incremented, anonymous vote exists from same IP)", tweetId, voterUserId);
                 return Result.Success();
@@ -72,8 +75,6 @@ public class VoteService : IVoteService
 
         await _db.Database.ExecuteSqlRawAsync(
 $"UPDATE Tweets SET VoteCount = VoteCount + 1 WHERE Id = {0}", tweetId, ct);
-
-        await _db.SaveChangesAsync(ct);
 
         _logger.LogInformation("Vote cast for tweet {TweetId} by {VoterIdentity}", tweetId, voterUserId?.ToString() ?? voterIp);
         return Result.Success();

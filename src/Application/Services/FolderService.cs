@@ -1,5 +1,7 @@
-﻿using Application.Interfaces;
+using Application.Interfaces;
 using Application.Models;
+using Domain.Entities;
+using Domain.Mappers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -10,96 +12,81 @@ namespace Application.Services;
 public class FolderService : IFolderService
 {
     private readonly IAppDbContext _db;
-    private readonly IBlobStorageService _blobStorage;
     private readonly FolderSettings _settings;
     private readonly ILogger<FolderService> _logger;
 
-    public FolderService(IAppDbContext db, IBlobStorageService blobStorage, IOptions<FolderSettings> settings, ILogger<FolderService> logger)
+    public FolderService(IAppDbContext db, IOptions<FolderSettings> settings, ILogger<FolderService> logger)
     {
         _db = db;
-        _blobStorage = blobStorage;
         _settings = settings.Value;
         _logger = logger;
     }
 
-    public async Task<Result<List<FolderSummaryDto>>> ListRootFoldersAsync(CancellationToken ct)
+    public async Task<Result<List<FolderSummary>>> ListRootFoldersAsync(CancellationToken ct)
     {
-        var folders = await _db.Folders
+        var folders = await _db.Folders.AsNoTracking()
+            .Include(f => f.CreatedByUser)
             .Where(f => f.ParentFolderId == null && f.IsActive)
-            .Select(f => new FolderSummaryDto(
-                f.Id,
-                f.Name,
-                f.Description,
-                f.Children.Count(c => c.IsActive)))
+            .Select(f => new { Record = f, ChildCount = f.Children.Count(c => c.IsActive) })
             .ToListAsync(ct);
 
-        return Result.Success(folders);
+        return Result.Success(folders.Select(f => new FolderSummary(FolderMapper.ToDomain(f.Record), f.ChildCount)).ToList());
     }
 
-    public async Task<Result<FolderDto>> GetByIdAsync(Guid id, CancellationToken ct)
+    public async Task<Result<Folder>> GetByIdAsync(Guid id, CancellationToken ct)
     {
-        var folder = await _db.Folders
+        var folder = await _db.Folders.AsNoTracking()
             .Include(f => f.Children)
+            .Include(f => f.CreatedByUser)
             .FirstOrDefaultAsync(f => f.Id == id && f.IsActive, ct);
 
         if (folder is null)
         {
-            return Result.Failure<FolderDto>(DomainError.NotFound($"Folder not found"));
+            return Result.Failure<Folder>(DomainError.NotFound($"Folder not found"));
         }
 
-        var children = folder.Children
+        var domainFolder = FolderMapper.ToDomain(folder);
+        domainFolder.Children = folder.Children
             .Where(c => c.IsActive)
-            .Select(c => new FolderSummaryDto(c.Id, c.Name, c.Description, 0))
+            .Select(c => FolderMapper.ToDomain(c))
             .ToList();
 
         var breadcrumb = await GetBreadcrumbAsync(folder, ct);
+        domainFolder.ParentFolder = BuildBreadcrumbChain(breadcrumb);
 
-        var dto = new FolderDto(
-            folder.Id,
-            folder.Name,
-            folder.Description,
-            folder.ParentFolderId,
-            children.Count,
-            folder.CreatedAt,
-            folder.IsActive,
-            children,
-            breadcrumb);
-
-        return Result.Success(dto);
+        return Result.Success(domainFolder);
     }
 
-    public async Task<Result<List<FolderSummaryDto>>> GetChildrenAsync(Guid id, CancellationToken ct)
+    public async Task<Result<List<FolderSummary>>> GetChildrenAsync(Guid id, CancellationToken ct)
     {
         var exists = await _db.Folders.AnyAsync(f => f.Id == id && f.IsActive, ct);
         if (!exists)
         {
-            return Result.Failure<List<FolderSummaryDto>>(DomainError.NotFound($"Folder not found"));
+            return Result.Failure<List<FolderSummary>>(DomainError.NotFound($"Folder not found"));
         }
 
-        var children = await _db.Folders
+        var children = await _db.Folders.AsNoTracking()
+            .Include(f => f.CreatedByUser)
             .Where(f => f.ParentFolderId == id && f.IsActive)
-            .Select(f => new FolderSummaryDto(
-                f.Id,
-                f.Name,
-                f.Description,
-                f.Children.Count(c => c.IsActive)))
+            .Select(f => new { Record = f, ChildCount = f.Children.Count(c => c.IsActive) })
             .ToListAsync(ct);
 
-        return Result.Success(children);
+        return Result.Success(children.Select(f => new FolderSummary(FolderMapper.ToDomain(f.Record), f.ChildCount)).ToList());
     }
 
-    public async Task<Result<SearchTweetsResult>> GetTweetsAsync(Guid folderId, string sort, int page, int pageSize, CancellationToken ct)
+    public async Task<Result<PagedResult<TweetWithAuthor>>> GetTweetsAsync(Guid folderId, string sort, int page, int pageSize, CancellationToken ct)
     {
         var exists = await _db.Folders.AnyAsync(f => f.Id == folderId && f.IsActive, ct);
         if (!exists)
         {
-            return Result.Failure<SearchTweetsResult>(DomainError.NotFound($"Folder not found"));
+            return Result.Failure<PagedResult<TweetWithAuthor>>(DomainError.NotFound($"Folder not found"));
         }
 
         var query = _db.FolderTweets
             .Where(ft => ft.FolderId == folderId)
             .Join(_db.Tweets, ft => ft.TweetId, t => t.Id, (ft, t) => t)
-            .Where(t => t.FetchStatus == "Ok");
+            .Where(t => t.FetchStatus == "Ok")
+            .AsNoTracking();
 
         var totalCount = await query.CountAsync(ct);
 
@@ -114,50 +101,41 @@ public class FolderService : IFolderService
 
         var authorIds = tweets.Where(t => t.AuthorXUserId != null).Select(t => t.AuthorXUserId!).Distinct(StringComparer.Ordinal).ToList();
         var profiles = authorIds.Count > 0
-            ? await _db.XUserProfiles.Where(p => authorIds.Contains(p.XUserId)).ToDictionaryAsync(p => p.XUserId, ct)
+            ? await _db.XUserProfiles.AsNoTracking().Where(p => authorIds.Contains(p.XUserId)).ToDictionaryAsync(p => p.XUserId, ct)
             : new Dictionary<string, XUserProfileRecord>(StringComparer.Ordinal);
 
-        var items = tweets.Select(t => new TweetDto(
-            t.Id,
-            t.XTweetId,
-            t.XTweetUrl,
-            t.AuthorXUserId,
-            t.AuthorXUsername,
-            t.TweetText,
-            t.TweetDate,
-            _blobStorage.GetScreenshotSasUrl(t.ScreenshotBlobName),
-            t.Tags,
-            t.VoteCount,
-            t.FetchStatus,
-            t.CreatedAt,
-            profiles.GetValueOrDefault(t.AuthorXUserId ?? string.Empty) is { } p
-                ? new XUserProfileDto(p.Id, p.XUserId, p.ScrapedUsername, p.CustomName, p.Description)
-                : null)).ToList();
+        var items = tweets.Select(t =>
+        {
+            var authorProfile = profiles.GetValueOrDefault(t.AuthorXUserId ?? string.Empty);
+            return new TweetWithAuthor(
+                TweetMapper.ToDomain(t),
+                authorProfile != null ? XUserProfileMapper.ToDomain(authorProfile) : null);
+        }).ToList();
 
-        return Result.Success(new SearchTweetsResult(items, totalCount));
+        return Result.Success(new PagedResult<TweetWithAuthor>(items, totalCount));
     }
 
-    public async Task<Result<FolderDto>> CreateAsync(string name, string? description, Guid? parentFolderId, Guid createdByUserId, CancellationToken ct)
+    public async Task<Result<Folder>> CreateAsync(string name, string? description, Guid? parentFolderId, Guid createdByUserId, CancellationToken ct)
     {
         if (parentFolderId.HasValue)
         {
-            var parent = await _db.Folders.FirstOrDefaultAsync(f => f.Id == parentFolderId && f.IsActive, ct);
+            var parent = await _db.Folders.AsNoTracking().FirstOrDefaultAsync(f => f.Id == parentFolderId && f.IsActive, ct);
             if (parent is null)
             {
-                return Result.Failure<FolderDto>(DomainError.NotFound($"Parent folder not found"));
+                return Result.Failure<Folder>(DomainError.NotFound($"Parent folder not found"));
             }
 
             var depth = await GetDepthAsync(parentFolderId, ct);
             if (depth + 1 > _settings.MaxDepth)
             {
-                return Result.Failure<FolderDto>(DomainError.Validation($"Maximum folder depth of {_settings.MaxDepth} exceeded"));
+                return Result.Failure<Folder>(DomainError.Validation($"Maximum folder depth of {_settings.MaxDepth} exceeded"));
             }
         }
 
         var userFolderCount = await _db.Folders.CountAsync(f => f.CreatedByUserId == createdByUserId && f.IsActive, ct);
         if (userFolderCount >= _settings.MaxPerContributor)
         {
-            return Result.Failure<FolderDto>(DomainError.Validation($"Maximum of {_settings.MaxPerContributor} folders per contributor exceeded"));
+            return Result.Failure<Folder>(DomainError.Validation($"Maximum of {_settings.MaxPerContributor} folders per contributor exceeded"));
         }
 
         var folder = new FolderRecord
@@ -170,45 +148,40 @@ public class FolderService : IFolderService
         };
 
         _db.Folders.Add(folder);
-        await _db.SaveChangesAsync(ct);
 
         _logger.LogInformation("Folder created: {FolderId} by user {UserId}", folder.Id, createdByUserId);
 
-        return Result.Success(new FolderDto(
-            folder.Id,
-            folder.Name,
-            folder.Description,
-            folder.ParentFolderId,
-            0,
-            folder.CreatedAt,
-            folder.IsActive));
+        return Result.Success(FolderMapper.ToDomain(folder));
     }
 
-    public async Task<Result<FolderDto>> UpdateAsync(Guid id, string? name, string? description, Guid? parentFolderId, CancellationToken ct)
+    public async Task<Result<Folder>> UpdateAsync(Guid id, string? name, string? description, Guid? parentFolderId, CancellationToken ct)
     {
-        var folder = await _db.Folders.FirstOrDefaultAsync(f => f.Id == id && f.IsActive, ct);
+        var folder = await _db.Folders
+            .Include(f => f.CreatedByUser)
+            .FirstOrDefaultAsync(f => f.Id == id && f.IsActive, ct);
+
         if (folder is null)
         {
-            return Result.Failure<FolderDto>(DomainError.NotFound($"Folder not found"));
+            return Result.Failure<Folder>(DomainError.NotFound($"Folder not found"));
         }
 
         if (parentFolderId.HasValue && parentFolderId != folder.ParentFolderId)
         {
             if (parentFolderId == id)
             {
-                return Result.Failure<FolderDto>(DomainError.Validation($"A folder cannot be its own parent"));
+                return Result.Failure<Folder>(DomainError.Validation($"A folder cannot be its own parent"));
             }
 
-            var parent = await _db.Folders.FirstOrDefaultAsync(f => f.Id == parentFolderId && f.IsActive, ct);
+            var parent = await _db.Folders.AsNoTracking().FirstOrDefaultAsync(f => f.Id == parentFolderId && f.IsActive, ct);
             if (parent is null)
             {
-                return Result.Failure<FolderDto>(DomainError.NotFound($"Parent folder not found"));
+                return Result.Failure<Folder>(DomainError.NotFound($"Parent folder not found"));
             }
 
             var depth = await GetDepthAsync(parentFolderId, ct);
             if (depth + 1 > _settings.MaxDepth)
             {
-                return Result.Failure<FolderDto>(DomainError.Validation($"Maximum folder depth of {_settings.MaxDepth} exceeded"));
+                return Result.Failure<Folder>(DomainError.Validation($"Maximum folder depth of {_settings.MaxDepth} exceeded"));
             }
 
             folder.ParentFolderId = parentFolderId;
@@ -224,19 +197,9 @@ public class FolderService : IFolderService
             folder.Description = description;
         }
 
-        await _db.SaveChangesAsync(ct);
-
         _logger.LogInformation("Folder updated: {FolderId}", id);
 
-        var childCount = await _db.Folders.CountAsync(f => f.ParentFolderId == id && f.IsActive, ct);
-        return Result.Success(new FolderDto(
-            folder.Id,
-            folder.Name,
-            folder.Description,
-            folder.ParentFolderId,
-            childCount,
-            folder.CreatedAt,
-            folder.IsActive));
+        return Result.Success(FolderMapper.ToDomain(folder));
     }
 
     public async Task<Result> AddTweetAsync(Guid folderId, Guid tweetId, Guid addedByUserId, CancellationToken ct)
@@ -271,7 +234,6 @@ public class FolderService : IFolderService
             TweetId = tweetId,
             AddedByUserId = addedByUserId,
         });
-        await _db.SaveChangesAsync(ct);
 
         _logger.LogInformation("Tweet {TweetId} added to folder {FolderId}", tweetId, folderId);
         return Result.Success();
@@ -288,30 +250,47 @@ public class FolderService : IFolderService
         }
 
         _db.FolderTweets.Remove(folderTweet);
-        await _db.SaveChangesAsync(ct);
 
         _logger.LogInformation("Tweet {TweetId} removed from folder {FolderId}", tweetId, folderId);
         return Result.Success();
     }
 
-    private async Task<List<FolderBreadcrumbDto>> GetBreadcrumbAsync(FolderRecord folder, CancellationToken ct)
+    private async Task<List<Folder>> GetBreadcrumbAsync(FolderRecord folder, CancellationToken ct)
     {
-        var breadcrumbs = new List<FolderBreadcrumbDto>();
+        var breadcrumbs = new List<Folder>();
         var currentParentId = folder.ParentFolderId;
 
         while (currentParentId != null)
         {
-            var parent = await _db.Folders.FirstOrDefaultAsync(f => f.Id == currentParentId, ct);
+            var parent = await _db.Folders.AsNoTracking()
+                .Include(f => f.CreatedByUser)
+                .FirstOrDefaultAsync(f => f.Id == currentParentId, ct);
+
             if (parent is null)
             {
                 break;
             }
 
-            breadcrumbs.Insert(0, new FolderBreadcrumbDto(parent.Id, parent.Name));
+            breadcrumbs.Insert(0, FolderMapper.ToDomain(parent));
             currentParentId = parent.ParentFolderId;
         }
 
         return breadcrumbs;
+    }
+
+    private static Folder? BuildBreadcrumbChain(List<Folder> breadcrumbs)
+    {
+        if (breadcrumbs.Count == 0)
+        {
+            return null;
+        }
+
+        for (var i = breadcrumbs.Count - 1; i > 0; i--)
+        {
+            breadcrumbs[i].ParentFolder = breadcrumbs[i - 1];
+        }
+
+        return breadcrumbs[^1];
     }
 
     private async Task<int> GetDepthAsync(Guid? parentFolderId, CancellationToken ct)
@@ -321,7 +300,7 @@ public class FolderService : IFolderService
         while (currentId != null)
         {
             depth++;
-            var parent = await _db.Folders.FirstOrDefaultAsync(f => f.Id == currentId, ct);
+            var parent = await _db.Folders.AsNoTracking().FirstOrDefaultAsync(f => f.Id == currentId, ct);
             currentId = parent?.ParentFolderId;
         }
 

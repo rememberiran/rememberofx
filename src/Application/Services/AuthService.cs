@@ -1,6 +1,7 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using Application;
 using Application.Interfaces;
 using Application.Models;
 using Microsoft.EntityFrameworkCore;
@@ -16,18 +17,26 @@ public class AuthService : IAuthService
     private readonly IAppDbContext _db;
     private readonly IXApiClient _xApiClient;
     private readonly JwtSettings _jwt;
+    private readonly IAsyncContext<IdentityContext> _identityContext;
     private readonly ILogger<AuthService> _logger;
 
-    public AuthService(IAppDbContext db, IXApiClient xApiClient, IOptions<JwtSettings> jwt, ILogger<AuthService> logger)
+    public AuthService(
+        IAppDbContext db,
+        IXApiClient xApiClient,
+        IOptions<JwtSettings> jwt,
+        IAsyncContext<IdentityContext> identityContext,
+        ILogger<AuthService> logger)
     {
         _db = db;
         _xApiClient = xApiClient;
         _jwt = jwt.Value;
+        _identityContext = identityContext;
         _logger = logger;
     }
 
-    public async Task<Result<AuthTokenResult>> ExchangeTokenAsync(string xAccessToken, string ipAddress, CancellationToken ct)
+    public async Task<Result<AuthTokenResult>> ExchangeTokenAsync(string xAccessToken, CancellationToken ct)
     {
+        var ipAddress = _identityContext.Value!.IpAddress;
         var xUser = await _xApiClient.GetCurrentUserAsync(xAccessToken, ct);
         if (xUser is null)
         {
@@ -39,7 +48,6 @@ public class AuthService : IAuthService
         if (user is null)
         {
             WriteAuditLog($"Auth.Denied", xUser.Id, ipAddress);
-            await _db.SaveChangesAsync(ct);
             _logger.LogWarning("Auth denied for unregistered X user {XUserId}", xUser.Id);
             return Result.Failure<AuthTokenResult>(DomainError.Forbidden($"Access denied — your X account is not registered"));
         }
@@ -47,7 +55,6 @@ public class AuthService : IAuthService
         if (!user.IsActive)
         {
             WriteAuditLog($"Auth.Denied", user.XUserId, ipAddress);
-            await _db.SaveChangesAsync(ct);
             _logger.LogWarning("Auth denied for deactivated user {XUserId}", user.XUserId);
             return Result.Failure<AuthTokenResult>(DomainError.Forbidden($"User account is deactivated"));
         }
@@ -81,7 +88,6 @@ public class AuthService : IAuthService
         var tokenString = new JwtSecurityTokenHandler().WriteToken(token);
 
         WriteAuditLog($"Auth.Login", user.XUserId, ipAddress);
-        await _db.SaveChangesAsync(ct);
 
         _logger.LogInformation("JWT generated for user {XUserId}, role {Role}", user.XUserId, user.Role);
 

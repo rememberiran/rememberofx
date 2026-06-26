@@ -19,10 +19,7 @@ public class AuthController : ControllerBase
     [HttpPost("token")]
     public async Task<IActionResult> ExchangeToken([FromBody] ExchangeTokenRequest request, CancellationToken ct)
     {
-        var result = await _authService.ExchangeTokenAsync(
-            request.XAccessToken,
-            HttpContext.GetClientIp(),
-            ct);
+        var result = await _authService.ExchangeTokenAsync(request.XAccessToken, ct);
 
         return result.IsSuccess
             ? Ok(new { token = result.Value!.Token, expiresAt = result.Value.ExpiresAt })
