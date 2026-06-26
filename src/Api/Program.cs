@@ -107,6 +107,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseAuthentication();
+app.UseMiddleware<ThrottlingMiddleware>();
 app.UseAuthorization();
 app.UseMiddleware<IdentityMiddleware>();
 app.UseMiddleware<UnitOfWorkMiddleware>();

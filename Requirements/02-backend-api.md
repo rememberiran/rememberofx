@@ -359,7 +359,9 @@ The Frontend handles X OAuth 2.0 PKCE and obtains an X access token. It then sen
 
 **Token expiry:** on `401` from any API call, the frontend clears the session cookie, sets `IsAuthenticated = false`, and redirects to `/?sessionExpired=true` with a banner. No silent refresh — the user must log in again via X SSO.
 
-**Mid-session deactivation:** the backend checks `IsActive` on every protected request against the `Users` table (not just at login). A deactivated user is rejected immediately on their next API call even within the 8h token window.
+**Mid-session deactivation:** `IdentityMiddleware` queries the `Users` table on every authenticated request (not just at login). If the user has been deactivated or removed since their JWT was issued, the middleware returns `403` immediately — the request never reaches the controller.
+
+**Real-time role enforcement:** `IdentityMiddleware` reads the user's current `Role` from the database and populates `IdentityContext.Roles`. This runs before `UseAuthorization()`, so `[Authorize]` policies always evaluate against the live DB role, not the potentially stale JWT `role` claim. If an admin demotes a user mid-session, the change takes effect on the next request.
 
 ---
 

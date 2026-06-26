@@ -4,6 +4,7 @@ using Api.Models.Requests;
 using Application;
 using Application.Interfaces;
 using Application.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Api.Controllers;
@@ -36,6 +37,7 @@ public class XUserProfilesController : ControllerBase
     }
 
     [HttpPut("{xUserId}")]
+    [Authorize(Roles = "Contributor,Admin")]
     public async Task<IActionResult> UpsertProfile(string xUserId, [FromBody] UpsertXUserProfileRequest request, CancellationToken ct)
     {
         var result = await _profileService.UpsertAsync(xUserId, request.CustomName, request.Description, _identityContext.Value?.InternalUserId, ct);

@@ -4,6 +4,7 @@ using Api.Models.Requests;
 using Application;
 using Application.Interfaces;
 using Application.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Api.Controllers;
@@ -101,6 +102,7 @@ public class FoldersController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = "Contributor,Admin")]
     public async Task<IActionResult> Create([FromBody] CreateFolderRequest request, CancellationToken ct)
     {
         var userId = _identityContext.Value?.InternalUserId;
@@ -122,6 +124,7 @@ public class FoldersController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [Authorize(Roles = "Contributor,Admin")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateFolderRequest request, CancellationToken ct)
     {
         var result = await _folderService.UpdateAsync(id, request.Name, request.Description, request.ParentFolderId, ct);
@@ -136,6 +139,7 @@ public class FoldersController : ControllerBase
     }
 
     [HttpPost("{folderId:guid}/tweets/{tweetId:guid}")]
+    [Authorize(Roles = "Contributor,Admin")]
     public async Task<IActionResult> AddTweet(Guid folderId, Guid tweetId, CancellationToken ct)
     {
         var result = await _folderService.AddTweetAsync(folderId, tweetId, ct);
@@ -143,6 +147,7 @@ public class FoldersController : ControllerBase
     }
 
     [HttpDelete("{folderId:guid}/tweets/{tweetId:guid}")]
+    [Authorize(Roles = "Contributor,Admin")]
     public async Task<IActionResult> RemoveTweet(Guid folderId, Guid tweetId, CancellationToken ct)
     {
         var result = await _folderService.RemoveTweetAsync(folderId, tweetId, ct);

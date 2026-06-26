@@ -12,18 +12,24 @@ Register middleware in this exact order in both the Backend API and the Frontend
 
 ```
 1. CorrelationIdMiddleware        ← must be first — opens logger scope before anything else
-2. HttpLoggingMiddleware          ← logs every request in and response out
-3. LoadSheddingMiddleware         ← rejects requests when server is at capacity
-4. UseHttpsRedirection
-5. UseRateLimiter                 ← per-IP, per-policy rate limits
-6. UseAuthentication
-7. UseAuthorization
-8. MapControllers / MapRazorComponents
+2. ExceptionHandler               ← catches unhandled exceptions → 500
+3. HttpLoggingMiddleware           ← logs every request in and response out
+4. LoadSheddingMiddleware          ← rejects requests when server is at capacity
+5. UseHttpsRedirection
+6. UseRateLimiter                  ← per-IP, per-policy rate limits
+7. UseAuthentication               ← validates JWT, populates context.User with claims
+8. IdentityMiddleware              ← DB lookup: resolves InternalUserId, Roles; 403 if deactivated
+9. UseAuthorization                ← evaluates [Authorize] policies using DB-fresh roles
+10. UnitOfWorkMiddleware           ← calls SaveChangesAsync if ChangeTracker has pending changes
+11. MapControllers / MapRazorComponents
 ```
 
 Order is non-negotiable:
 - `CorrelationIdMiddleware` before `HttpLoggingMiddleware` — the correlation ID must be in scope before the first log entry is written.
 - `LoadSheddingMiddleware` before `UseRateLimiter` — capacity protection is more fundamental than per-user throttling. A shed request never consumes a rate-limit slot.
+- `UseAuthentication` before `IdentityMiddleware` — the JWT must be validated and claims populated on `context.User` before the middleware can read them.
+- `IdentityMiddleware` before `UseAuthorization` — the middleware queries the DB for the user's current role and sets `IdentityContext.Roles`. This ensures `[Authorize]` policies use the live DB role, not the potentially stale JWT `role` claim. If the user has been deactivated since their JWT was issued, the middleware returns 403 immediately.
+- `UnitOfWorkMiddleware` wraps controller execution — if an exception propagates, `SaveChangesAsync` is never called.
 
 ---
 

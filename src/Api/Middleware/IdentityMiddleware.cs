@@ -27,6 +27,8 @@ public class IdentityMiddleware
         var username = user.FindFirstValue($"username");
 
         Guid? internalUserId = null;
+        IReadOnlyList<string> roles = [];
+
         if (xUserId != null)
         {
             var dbUser = await db.Users.AsNoTracking()
@@ -42,12 +44,14 @@ public class IdentityMiddleware
             }
 
             internalUserId = dbUser.Id;
+            roles = [dbUser.Role];
         }
 
         identityContext.Value = new IdentityContext
         {
             XUserId = xUserId,
             InternalUserId = internalUserId,
+            Roles = roles,
             XUsername = username,
             XEmail = user.FindFirstValue(ClaimTypes.Email) ?? user.FindFirstValue($"email"),
             IpAddress = ipAddress,
