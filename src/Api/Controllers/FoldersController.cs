@@ -1,6 +1,7 @@
 ﻿using Api.Extensions;
 using Api.Mappers;
 using Api.Models.Requests;
+using Api.Models.Responses;
 using Application;
 using Application.Interfaces;
 using Application.Models;
@@ -28,6 +29,7 @@ public class FoldersController : ControllerBase
     }
 
     [HttpGet]
+    [ProducesResponseType(typeof(List<FolderSummaryDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> List(CancellationToken ct)
     {
         var result = await _folderService.ListRootFoldersAsync(ct);
@@ -42,6 +44,8 @@ public class FoldersController : ControllerBase
     }
 
     [HttpGet("{id:guid}")]
+    [ProducesResponseType(typeof(FolderDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(Guid id, CancellationToken ct)
     {
         var result = await _folderService.GetByIdAsync(id, ct);
@@ -68,6 +72,8 @@ public class FoldersController : ControllerBase
     }
 
     [HttpGet("{id:guid}/children")]
+    [ProducesResponseType(typeof(List<FolderSummaryDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetChildren(Guid id, CancellationToken ct)
     {
         var result = await _folderService.GetChildrenAsync(id, ct);
@@ -82,6 +88,8 @@ public class FoldersController : ControllerBase
     }
 
     [HttpGet("{id:guid}/tweets")]
+    [ProducesResponseType(typeof(FolderTweetsResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetTweets(
         Guid id,
         [FromQuery] string sort = "votes",
@@ -98,11 +106,14 @@ public class FoldersController : ControllerBase
 
         var data = result.Value!;
         var items = _tweetDtoMapper.ToDtoList(data.Items);
-        return Ok(new { items, totalCount = data.TotalCount });
+        return Ok(new FolderTweetsResponse(items, data.TotalCount));
     }
 
     [HttpPost]
     [Authorize(Roles = "Contributor,Admin")]
+    [ProducesResponseType(typeof(FolderDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Create([FromBody] CreateFolderRequest request, CancellationToken ct)
     {
         var userId = _identityContext.Value?.InternalUserId;
@@ -125,6 +136,9 @@ public class FoldersController : ControllerBase
 
     [HttpPut("{id:guid}")]
     [Authorize(Roles = "Contributor,Admin")]
+    [ProducesResponseType(typeof(FolderDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateFolderRequest request, CancellationToken ct)
     {
         var result = await _folderService.UpdateAsync(id, request.Name, request.Description, request.ParentFolderId, ct);
@@ -140,6 +154,9 @@ public class FoldersController : ControllerBase
 
     [HttpPost("{folderId:guid}/tweets/{tweetId:guid}")]
     [Authorize(Roles = "Contributor,Admin")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> AddTweet(Guid folderId, Guid tweetId, CancellationToken ct)
     {
         var result = await _folderService.AddTweetAsync(folderId, tweetId, ct);
@@ -148,6 +165,8 @@ public class FoldersController : ControllerBase
 
     [HttpDelete("{folderId:guid}/tweets/{tweetId:guid}")]
     [Authorize(Roles = "Contributor,Admin")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> RemoveTweet(Guid folderId, Guid tweetId, CancellationToken ct)
     {
         var result = await _folderService.RemoveTweetAsync(folderId, tweetId, ct);

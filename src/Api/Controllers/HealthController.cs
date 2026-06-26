@@ -1,4 +1,5 @@
-﻿using Application;
+﻿using Api.Models.Responses;
+using Application;
 using Application.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 
@@ -20,12 +21,15 @@ public class HealthController : ControllerBase
     }
 
     [HttpGet("live")]
+    [ProducesResponseType(typeof(HealthResponse), StatusCodes.Status200OK)]
     public IActionResult Live()
     {
-        return Ok(new { status = $"Healthy" });
+        return Ok(new HealthResponse($"Healthy"));
     }
 
     [HttpGet("ready")]
+    [ProducesResponseType(typeof(ReadinessResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ReadinessResponse), StatusCodes.Status503ServiceUnavailable)]
     public async Task<IActionResult> Ready(CancellationToken ct)
     {
         var dbHealthy = false;
@@ -50,7 +54,7 @@ public class HealthController : ControllerBase
         }
 
         var ready = dbHealthy && queueHealthy;
-        var response = new { status = ready ? $"Ready" : $"Unhealthy", db = dbHealthy, queue = queueHealthy };
+        var response = new ReadinessResponse(ready ? $"Ready" : $"Unhealthy", dbHealthy, queueHealthy);
 
         return ready ? Ok(response) : StatusCode(503, response);
     }

@@ -1,4 +1,5 @@
 ﻿using Api.Extensions;
+using Api.Models.Responses;
 using Application;
 using Application.Interfaces;
 using Application.Models;
@@ -20,12 +21,15 @@ public class VotesController : ControllerBase
     }
 
     [HttpPost("{tweetId:guid}")]
+    [ProducesResponseType(typeof(VoteResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> CastVote(Guid tweetId, CancellationToken ct)
     {
         var result = await _voteService.CastVoteAsync(tweetId, _identityContext.Value?.InternalUserId, ct);
 
         return result.IsSuccess
-            ? Ok(new { message = $"Vote recorded" })
+            ? Ok(new VoteResponse($"Vote recorded"))
             : result.ToActionResult();
     }
 }

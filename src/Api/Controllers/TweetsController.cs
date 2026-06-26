@@ -1,6 +1,7 @@
 using Api.Extensions;
 using Api.Mappers;
 using Api.Models.Requests;
+using Api.Models.Responses;
 using Application.Interfaces;
 using Application.Models;
 using Domain.Enums;
@@ -27,6 +28,9 @@ public class TweetsController : ControllerBase
     }
 
     [HttpPost]
+    [ProducesResponseType(typeof(SubmitTweetResponse), StatusCodes.Status202Accepted)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Submit([FromBody] SubmitTweetRequest request, CancellationToken ct)
     {
         var command = new SubmitTweetCommand(
@@ -41,14 +45,12 @@ public class TweetsController : ControllerBase
             return result.ToActionResult();
         }
 
-        return Accepted(new
-        {
-            tweetId = result.Value!.Id,
-            fetchStatus = result.Value.FetchStatus.ToString(),
-        });
+        return Accepted(new SubmitTweetResponse(result.Value!.Id, result.Value.FetchStatus.ToString()));
     }
 
     [HttpGet("{id:guid}/status")]
+    [ProducesResponseType(typeof(TweetStatusResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetStatus(Guid id, CancellationToken ct)
     {
         var result = await _queryService.GetStatusAsync(id, ct);
@@ -70,15 +72,12 @@ public class TweetsController : ControllerBase
             _ => null,
         };
 
-        return Ok(new
-        {
-            tweetId = tweet.Id,
-            fetchStatus = tweet.FetchStatus.ToString(),
-            tweetData,
-        });
+        return Ok(new TweetStatusResponse(tweet.Id, tweet.FetchStatus.ToString(), tweetData));
     }
 
     [HttpGet("{id:guid}")]
+    [ProducesResponseType(typeof(TweetDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(Guid id, CancellationToken ct)
     {
         var result = await _queryService.GetByIdAsync(id, ct);

@@ -1,6 +1,7 @@
 using Api.Extensions;
 using Api.Mappers;
 using Api.Models.Requests;
+using Api.Models.Responses;
 using Application;
 using Application.Interfaces;
 using Application.Models;
@@ -24,6 +25,7 @@ public class AdminController : ControllerBase
     }
 
     [HttpGet("users")]
+    [ProducesResponseType(typeof(List<UserDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> ListUsers(CancellationToken ct)
     {
         var result = await _userService.ListAllAsync(ct);
@@ -38,6 +40,8 @@ public class AdminController : ControllerBase
     }
 
     [HttpPost("users")]
+    [ProducesResponseType(typeof(UserDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> AddUser([FromBody] AddUserRequest request, CancellationToken ct)
     {
         var result = await _userService.AddAsync(request.XUserId, request.Role, _identityContext.Value?.InternalUserId, ct);
@@ -52,6 +56,8 @@ public class AdminController : ControllerBase
     }
 
     [HttpPut("users/{id:guid}")]
+    [ProducesResponseType(typeof(UserDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateUser(Guid id, [FromBody] UpdateUserRequest request, CancellationToken ct)
     {
         var result = await _userService.UpdateAsync(id, request.Role, request.IsActive, ct);
@@ -66,6 +72,8 @@ public class AdminController : ControllerBase
     }
 
     [HttpDelete("users/{id:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeactivateUser(Guid id, CancellationToken ct)
     {
         var result = await _userService.DeactivateAsync(id, ct);

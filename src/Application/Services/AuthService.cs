@@ -64,13 +64,33 @@ public class AuthService : IAuthService
             user.XUsername = xUser.Username;
         }
 
+        WriteAuditLog($"Auth.Login", user.XUserId, ipAddress);
+
+        return Result.Success(GenerateJwt(user));
+    }
+
+    public async Task<Result<AuthTokenResult>> GenerateDevTokenAsync(string xUserId, CancellationToken ct)
+    {
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.XUserId == xUserId && u.IsActive, ct);
+        if (user is null)
+        {
+            return Result.Failure<AuthTokenResult>(DomainError.NotFound($"User not found or inactive"));
+        }
+
+        _logger.LogInformation("Dev token generated for user {XUserId}, role {Role}", user.XUserId, user.Role);
+
+        return Result.Success(GenerateJwt(user));
+    }
+
+    private AuthTokenResult GenerateJwt(UserRecord user)
+    {
         var now = DateTime.UtcNow;
         var expiresAt = now.AddHours(_jwt.ExpiryHours);
 
         var claims = new[]
         {
             new Claim(JwtRegisteredClaimNames.Sub, user.XUserId),
-            new Claim($"username", xUser.Username),
+            new Claim($"username", user.XUsername),
             new Claim($"role", user.Role),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             new Claim(JwtRegisteredClaimNames.Iat, new DateTimeOffset(now).ToUnixTimeSeconds().ToString(System.Globalization.CultureInfo.InvariantCulture), ClaimValueTypes.Integer64),
@@ -87,11 +107,9 @@ public class AuthService : IAuthService
 
         var tokenString = new JwtSecurityTokenHandler().WriteToken(token);
 
-        WriteAuditLog($"Auth.Login", user.XUserId, ipAddress);
-
         _logger.LogInformation("JWT generated for user {XUserId}, role {Role}", user.XUserId, user.Role);
 
-        return Result.Success(new AuthTokenResult(tokenString, expiresAt));
+        return new AuthTokenResult(tokenString, expiresAt);
     }
 
     private void WriteAuditLog(string action, string xUserId, string ipAddress)

@@ -1,4 +1,5 @@
-﻿using Application;
+﻿using Api.Models.Responses;
+using Application;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Api.Extensions;
@@ -27,7 +28,7 @@ public static class ResultExtensions
 
     private static ObjectResult ToErrorResult(DomainError error)
     {
-        var body = new { error = error.Code, message = error.Message };
+        var body = new ErrorResponse(error.Code, error.Message);
 
         return error.StatusCode switch
         {

@@ -1,5 +1,6 @@
 using Api.Extensions;
 using Api.Mappers;
+using Api.Models.Responses;
 using Application.Interfaces;
 using Application.Models;
 using Microsoft.AspNetCore.Mvc;
@@ -20,6 +21,8 @@ public class SearchController : ControllerBase
     }
 
     [HttpGet]
+    [ProducesResponseType(typeof(SearchTweetsResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Search(
         [FromQuery] string? q,
         [FromQuery] string? tag,
@@ -44,11 +47,6 @@ public class SearchController : ControllerBase
             ? XUserProfileDtoMapper.ToDto(data.SubjectProfile)
             : null;
 
-        return Ok(new
-        {
-            items,
-            totalCount = data.TotalCount,
-            subjectProfile,
-        });
+        return Ok(new SearchTweetsResponse(items, data.TotalCount, subjectProfile));
     }
 }

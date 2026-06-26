@@ -1,6 +1,7 @@
 using Api.Extensions;
 using Api.Mappers;
 using Api.Models.Requests;
+using Api.Models.Responses;
 using Application;
 using Application.Interfaces;
 using Application.Models;
@@ -23,6 +24,8 @@ public class XUserProfilesController : ControllerBase
     }
 
     [HttpGet("{xUserId}")]
+    [ProducesResponseType(typeof(XUserProfileDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetProfile(string xUserId, CancellationToken ct)
     {
         var result = await _profileService.GetByXUserIdAsync(xUserId, ct);
@@ -38,6 +41,8 @@ public class XUserProfilesController : ControllerBase
 
     [HttpPut("{xUserId}")]
     [Authorize(Roles = "Contributor,Admin")]
+    [ProducesResponseType(typeof(XUserProfileDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> UpsertProfile(string xUserId, [FromBody] UpsertXUserProfileRequest request, CancellationToken ct)
     {
         var result = await _profileService.UpsertAsync(xUserId, request.CustomName, request.Description, _identityContext.Value?.InternalUserId, ct);
