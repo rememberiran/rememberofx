@@ -35,7 +35,36 @@ No EF queries, no branching logic, no direct infrastructure calls in controllers
 
 ---
 
-## 2. Project Structure
+## 2. Result Pattern — No Exceptions for Control Flow
+
+All service methods return a **`Result<T>`** (or `Result` for void operations) instead of throwing exceptions. Exceptions are reserved exclusively for truly unexpected failures (e.g., null references, configuration errors, infrastructure faults).
+
+- Services return `Result.Success(value)` or `Result.Failure(error)` with a typed error.
+- Controllers map `Result` outcomes to HTTP responses — success to `200`/`201`/`202`, failure to `400`/`404`/`409` etc.
+- No `try/catch` in controllers for business logic errors — the `Result` type carries error information explicitly.
+- Infrastructure failures (DB unavailable, queue timeout) may still throw and are caught by global exception-handling middleware, which returns `500`.
+
+```csharp
+// Service returns Result
+public async Task<Result<TweetDto>> GetByIdAsync(Guid id, CancellationToken ct)
+{
+    var tweet = await _db.Tweets.FindAsync(id, ct);
+    if (tweet is null)
+        return Result.Failure<TweetDto>(DomainError.NotFound("Tweet not found"));
+
+    return Result.Success(MapToDto(tweet));
+}
+
+// Controller maps Result to HTTP
+var result = await _tweetQueryService.GetByIdAsync(id, ct);
+return result.IsSuccess
+    ? Ok(result.Value)
+    : result.ToActionResult();
+```
+
+---
+
+## 3. Project Structure
 
 ```
 src/
@@ -86,12 +115,11 @@ src/
     Data/
       AppDbContext.cs
       Migrations/
-      Repositories/
       Seed/
         DatabaseSeeder.cs
     Queue/
       ScrapeQueueService.cs        # Wraps Azure Storage Queue
-      ScrapeJobMessage.cs          # { TweetId, XTweetUrl, CorrelationId }
+      ScrapeJobMessage.cs          # { XTweetUrl, XTweetId, AuthorXUsername, FolderIds, SubmittedByUserId, SubmittedByIp, CorrelationId }
     BlobStorage/
       BlobStorageService.cs
 
@@ -108,7 +136,7 @@ src/
 
 ---
 
-## 3. API Endpoints
+## 4. API Endpoints
 
 ### Public (no auth required)
 
@@ -151,38 +179,39 @@ src/
 
 ---
 
-## 4. Tweet Submission Flow
+## 5. Tweet Submission Flow
 
 All logic is in `TweetSubmissionService`. The controller only maps HTTP request → command → HTTP response.
 
+The API does **not** create a `Tweet` row, `XUserProfile` stub, or `FolderTweet` rows. It only writes an audit log and enqueues the full submission details. The Worker is responsible for all database writes after scraping (see `04-worker.md §4`).
+
 1. Parse `XTweetId` from URL via regex `/status/(\d+)/` — return `400` if no match. Also parse `AuthorXUsername` from URL path (`https://x.com/{username}/status/{id}`).
 2. **Duplicate check:** query `Tweets` by `XTweetId`. If found, return `409 Conflict` with `{ tweetId, fetchStatus, message: "Already submitted" }`.
-3. Begin SQL transaction:
-   - Insert stub `Tweet` row: `FetchStatus='Pending'`, all scraped columns null.
-   - **Auto-create `XUserProfiles` stub:** if no row exists for this `XUserId`, insert stub with `ScrapedUsername` from URL parse, `CustomName = NULL`, `CreatedByUserId = NULL`. No-op if profile exists.
-   - If authenticated Contributor and `folderIds` provided: insert `FolderTweet` rows.
-   - Insert `AuditLog` row: `Action='Tweet.Submit'`.
-4. Commit transaction.
-5. **After commit:** enqueue `ScrapeJobMessage` to `scrape-jobs` queue: `{ tweetId, xTweetUrl, correlationId }`.
-6. Return `202 Accepted` with `{ tweetId, fetchStatus: "Pending" }`.
+3. Insert `AuditLog` row: `Action='Tweet.SubmitRequest'`, `Payload` = JSON of `{ xTweetUrl, xTweetId, authorXUsername, folderIds, submittedByUserId, submittedByIp }`.
+4. Enqueue `ScrapeJobMessage` to `scrape-jobs` queue with all submission details (see below).
+5. Return `202 Accepted`.
 
-> **If enqueue fails after commit:** the tweet row exists with `FetchStatus='Pending'` but no job is in the queue. Log `Warning`. Any tweet stuck in `Pending` for > 10 minutes can be re-enqueued via admin action or a reconciliation job.
+> **If enqueue fails after audit log:** no tweet row exists, but the audit log records the intent. Log `Warning`. The user can re-submit since there is no `Tweet` row to trigger the duplicate check.
 
-### Submission Transaction Boundary
+### ScrapeJobMessage
 
-```
-BEGIN TRANSACTION
-  INSERT INTO Tweets (Id, XTweetId, XTweetUrl, FetchStatus='Pending', SubmittedByIp, ...)
-  INSERT OR IGNORE INTO XUserProfiles (XUserId, ScrapedUsername, CreatedAt, ...)
-  INSERT INTO FolderTweets (...)    -- if folderIds provided
-  INSERT INTO AuditLog (Action='Tweet.Submit', ...)
-COMMIT
--- After commit only: enqueue to Azure Storage Queue
+The queue message carries everything the Worker needs to create the tweet and related records:
+
+```json
+{
+  "xTweetUrl": "https://x.com/user/status/123456",
+  "xTweetId": "123456",
+  "authorXUsername": "user",
+  "folderIds": ["guid1", "guid2"],
+  "submittedByUserId": "guid-or-null",
+  "submittedByIp": "1.2.3.4",
+  "correlationId": "uuid"
+}
 ```
 
 ---
 
-## 5. Status Polling Endpoint
+## 6. Status Polling Endpoint
 
 `GET /api/tweets/{id}/status`
 
@@ -202,17 +231,57 @@ The frontend polls every 3 seconds. Maximum poll duration: 2 minutes. See `05-fr
 
 ---
 
-## 6. Search Behaviour
+## 7. Search Behaviour
 
 - Returns only tweets with `FetchStatus = 'Ok'`
-- At least one of `q`, `username`, or `userId` required — returns `400` if all absent
+- At least one of `q`, `tag`, `username`, or `userId` required — returns `400` if all absent
 - Multiple params combine with **AND** logic
 
 | Param | Strategy |
 |---|---|
-| `q` | `CONTAINS(TweetText, @q)` via SQL Server full-text index; also searches `Tags` via `JSON_VALUE` |
+| `q` | Full-text search on `TweetText`, `XUserProfiles.CustomName`, and `XUserProfiles.Description` — supports both **English** and **Farsi** (see multilingual setup below) |
+| `tag` | Exact tag match within `Tags` JSON array — e.g. `tag=freedom` matches `["freedom","iran"]` |
 | `username` | Case-insensitive `LIKE '%' + @username + '%'` on `AuthorXUsername` |
 | `userId` | Exact match on `AuthorXUserId` |
+
+### Multilingual Full-Text Search (English + Farsi)
+
+SQL Server full-text search must support both English and Farsi keywords across `TweetText`, `XUserProfiles.CustomName`, and `XUserProfiles.Description`:
+
+1. **Full-text catalog:** create a single `FT_MemoryOfX` catalog shared by both tables.
+2. **Full-text indexes:** use `LANGUAGE 0` (Neutral) so the word breaker handles both Latin and Arabic-script tokens without requiring a language column or dual-index.
+3. **Query:** when `q` is provided, search across both tables using `CONTAINS` and combine results — tweets match directly on text, or via a `JOIN` to `XUserProfiles` on `AuthorXUserId = XUserId` where the profile's `CustomName` or `Description` matches.
+4. **Tags search** uses `OPENJSON(Tags)` with an exact-match filter rather than full-text — tags are structured data, not free text.
+
+> **Setup migration:** the EF migration must create the full-text catalog and indexes via raw SQL (`migrationBuilder.Sql(...)`), since EF Core has no first-class full-text support.
+
+```sql
+-- Migration: CreateFullTextIndexes
+CREATE FULLTEXT CATALOG FT_MemoryOfX AS DEFAULT;
+
+CREATE FULLTEXT INDEX ON Tweets(TweetText LANGUAGE 0)
+  KEY INDEX PK_Tweets
+  WITH STOPLIST = OFF;
+
+CREATE FULLTEXT INDEX ON XUserProfiles(CustomName LANGUAGE 0, Description LANGUAGE 0)
+  KEY INDEX PK_XUserProfiles
+  WITH STOPLIST = OFF;
+```
+
+`STOPLIST = OFF` is intentional — the default English stoplist drops common words that may be meaningful in Farsi search contexts.
+
+**Search query logic for `q` parameter:**
+```sql
+SELECT DISTINCT t.*
+FROM Tweets t
+LEFT JOIN XUserProfiles p ON t.AuthorXUserId = p.XUserId
+WHERE t.FetchStatus = 'Ok'
+  AND (
+    CONTAINS(t.TweetText, @q)
+    OR CONTAINS(p.CustomName, @q)
+    OR CONTAINS(p.Description, @q)
+  )
+```
 
 Sorting:
 - `sort=votes` (default): `ORDER BY VoteCount DESC, CreatedAt DESC`
@@ -226,7 +295,7 @@ Zero results: `200 OK` with `{ items: [], totalCount: 0 }`.
 
 ---
 
-## 7. Voting — Deduplication Strategy
+## 8. Voting — Deduplication Strategy
 
 Handled entirely in `VoteService`. Logic:
 
@@ -237,7 +306,7 @@ Handled entirely in `VoteService`. Logic:
 
 ---
 
-## 8. JWT Specification
+## 9. JWT Specification
 
 - **Algorithm:** HS256 (shared secret between Backend and Frontend)
 - **Issuer:** `Jwt:Issuer` config key (e.g., `https://memoryofx.com`)
@@ -259,7 +328,7 @@ Handled entirely in `VoteService`. Logic:
 
 ---
 
-## 9. Configuration
+## 10. Configuration
 
 ### `appsettings.Development.json` (committed, non-sensitive)
 
@@ -271,7 +340,6 @@ Handled entirely in `VoteService`. Logic:
   "BlobStorage": { "AccountUrl": "https://stmoxdev.blob.core.windows.net/" },
   "Queue": { "AccountUrl": "https://stmoxdev.queue.core.windows.net/", "QueueName": "scrape-jobs" },
   "Jwt": { "Issuer": "https://localhost:5000", "ExpiryHours": 8 },
-  "RateLimit": { "UseRedis": false },
   "Otel": { "UseConsoleExporter": true },
   "Seed": { "AdminXUserId": "", "AdminXUsername": "" },
   "Folders": { "MaxPerContributor": 50, "MaxTweetsPerFolder": 1000, "MaxDepth": 5 }
@@ -299,7 +367,6 @@ Handled entirely in `VoteService`. Logic:
 | `Queue__AccountUrl` | `queue-storage-url` |
 | `Queue__QueueName` | (literal — `scrape-jobs`) |
 | `Jwt__Secret` | `jwt-secret` |
-| `Redis__ConnectionString` | `redis-connection-string` |
 | `ApplicationInsights__ConnectionString` | `app-insights-connection-string` |
 | `Seed__AdminXUserId` | `seed-admin-x-user-id` |
 | `Seed__AdminXUsername` | `seed-admin-x-username` |

@@ -8,7 +8,7 @@
 
 ## 1. Overview
 
-The Worker is a separate .NET Worker Service project (`src/Worker`) deployed as its own ACA container (`ca-mox-worker-prod`). It has **no HTTP endpoints**. Its sole job is to dequeue `ScrapeJobMessage` messages from the `scrape-jobs` Azure Storage Queue and run Playwright to scrape tweet content.
+The Worker is a separate .NET Worker Service project (`src/Worker`) deployed as its own ACA container (`ca-mox-worker-prod`). It has **no HTTP endpoints**. Its sole job is to dequeue `ScrapeJobMessage` messages from the `scrape-jobs` Azure Storage Queue, scrape tweet content via Playwright, and **persist all results to the database**. The API does not write tweet records — it only enqueues and writes an audit log (see `02-backend-api.md §4`).
 
 Locally (F5), the Worker runs as a third startup project alongside the API and Frontend. It uses the same `DefaultAzureCredential` pattern — resolves to VS/Azure CLI credentials locally, Managed Identity in production.
 
@@ -66,11 +66,13 @@ protected override async Task ExecuteAsync(CancellationToken stoppingToken)
 
 ## 4. Scrape Job Flow
 
-All logic in `ScrapeJob.ExecuteAsync`. For each message `{ tweetId, xTweetUrl, correlationId }`:
+All logic in `ScrapeJob.ExecuteAsync`. The Worker is responsible for **all database writes** — the API only enqueues a message and writes an audit log (see `02-backend-api.md §4`).
 
-1. Open logger scope `{ CorrelationId, TweetId }` — all worker logs carry these fields.
-2. Update `Tweets.FetchStatus = 'Processing'`, increment `ScrapeAttempts`.
-3. Check `message.DequeueCount >= 3` — if so, skip scraping and go directly to step 10 (ScrapeFailed).
+Each message contains: `{ xTweetUrl, xTweetId, authorXUsername, folderIds, submittedByUserId, submittedByIp, correlationId }`.
+
+1. Open logger scope `{ CorrelationId, XTweetId }` — all worker logs carry these fields.
+2. **Duplicate check:** query `Tweets` by `XTweetId`. If a row already exists, log `Info` ("duplicate — already processed"), delete message, return. (Handles the case where the API's dedup check passed but the message was enqueued twice.)
+3. Check `message.DequeueCount >= 3` — if so, skip scraping and go directly to the failure path (see §6): insert `Tweet` row with `FetchStatus='ScrapeFailed'`, audit, delete message, return.
 4. Launch Playwright headless Chromium (see §5 for required flags).
 5. Navigate to `xTweetUrl` **without authentication** — public page, no cookies, no session.
 6. Wait for CSS selector `article[data-testid="tweet"]` to render; timeout: 20 seconds.
@@ -82,12 +84,14 @@ All logic in `ScrapeJob.ExecuteAsync`. For each message `{ tweetId, xTweetUrl, c
    - `Tags` — all `#hashtag` anchor links in the tweet body → JSON array
 8. Capture PNG screenshot of the `<article>` element only (not full page): `await element.ScreenshotAsync()`.
 9. Upload PNG to Azure Blob Storage — container: `screenshots`, blob name: `{XTweetId}.png`. If upload fails: log `Error`, set `ScreenshotBlobName = null`, continue (see §6.2).
-10. **Upsert `XUserProfiles`** using `AuthorXUserId` from scrape:
-    - No row exists → insert stub: `XUserId`, `ScrapedUsername`, `CustomName = NULL`, `CreatedByUserId = NULL`
-    - Row exists with placeholder `XUserId` (username) → update to canonical numeric ID and `ScrapedUsername`
-    - Row exists with correct `XUserId` → update `ScrapedUsername` only (handle may have changed)
-11. SQL transaction (see §7): update `Tweets`, upsert `XUserProfiles`, insert `AuditLog`.
-12. Delete message from queue (signals successful processing).
+10. **SQL transaction (see §7):**
+    - **Insert `Tweet` row** with all scraped data, `FetchStatus='Ok'`, and submission metadata from the queue message (`SubmittedByUserId`, `SubmittedByIp`).
+    - **Upsert `XUserProfiles`** using `AuthorXUserId` from scrape:
+      - No row exists → insert stub: `XUserId`, `ScrapedUsername`, `CustomName = NULL`, `CreatedByUserId = NULL`
+      - Row exists → update `ScrapedUsername` (handle may have changed)
+    - **Insert `FolderTweet` rows** if `folderIds` were provided in the message.
+    - **Insert `AuditLog`** row: `Action='Tweet.Scraped'`.
+11. Delete message from queue (signals successful processing).
 
 ---
 
@@ -134,11 +138,11 @@ See `07-infrastructure.md` for the full Worker Dockerfile.
 
 | Condition | Behaviour |
 |---|---|
-| Deleted / unavailable tweet (`"This tweet is unavailable"` tombstone) | `FetchStatus='NotFound'`, audit `Tweet.NotFound`, delete message — **no retry** |
-| Protected account (`"These tweets are from a protected account"`) | `FetchStatus='Private'`, audit `Tweet.Private`, delete message — **no retry** |
+| Deleted / unavailable tweet (`"This tweet is unavailable"` tombstone) | Insert `Tweet` with `FetchStatus='NotFound'`, audit `Tweet.NotFound`, delete message — **no retry** |
+| Protected account (`"These tweets are from a protected account"`) | Insert `Tweet` with `FetchStatus='Private'`, audit `Tweet.Private`, delete message — **no retry** |
 | Playwright navigation timeout (20s) | Do NOT delete message — let visibility timeout expire → automatic retry |
 | DOM extraction fails (element not found) | Same as timeout — retry via visibility timeout |
-| `DequeueCount >= 3` | `FetchStatus='ScrapeFailed'`, `ScrapeError=<message>`, audit `Tweet.ScrapeFailed`, delete message |
+| `DequeueCount >= 3` | Insert `Tweet` with `FetchStatus='ScrapeFailed'`, `ScrapeError=<message>`, audit `Tweet.ScrapeFailed`, delete message |
 | Unhandled exception | Log `Error`, do NOT delete message — automatic retry via visibility timeout |
 
 ### Retry via DequeueCount
@@ -146,7 +150,7 @@ See `07-infrastructure.md` for the full Worker Dockerfile.
 ```csharp
 if (message.DequeueCount >= 3)
 {
-    await SetScrapeFailedAsync(tweetId, "Max retries exceeded");
+    await InsertScrapeFailedAsync(message, "Max retries exceeded");
     await _queue.DeleteMessageAsync(message);
     return;
 }
@@ -164,18 +168,40 @@ If Azure Blob Storage is unreachable during screenshot upload:
 
 ## 7. Worker Transaction Boundary
 
+The Worker creates all records in a single transaction. No tweet row exists before this point — the API only wrote an audit log.
+
+### Success Path (scrape succeeded)
+
 ```
 BEGIN TRANSACTION
-  UPDATE Tweets
-    SET FetchStatus, AuthorXUserId, AuthorXUsername, TweetText,
-        TweetDate, Tags, ScreenshotBlobName, ScrapedAt, ScrapeAttempts
-    WHERE Id = @tweetId
+  INSERT INTO Tweets
+    (Id, XTweetId, XTweetUrl, FetchStatus='Ok', AuthorXUserId, AuthorXUsername,
+     TweetText, TweetDate, Tags, ScreenshotBlobName, ScrapedAt,
+     ScrapeAttempts, SubmittedByUserId, SubmittedByIp, CreatedAt)
 
   INSERT OR UPDATE XUserProfiles (XUserId, ScrapedUsername, ...)
     -- upsert: create stub if absent, update ScrapedUsername if present
 
-  INSERT INTO AuditLog
-    (Action = 'Tweet.Scraped' | 'Tweet.NotFound' | 'Tweet.Private' | 'Tweet.ScrapeFailed', ...)
+  INSERT INTO FolderTweets (FolderId, TweetId, AddedByUserId, AddedAt)
+    -- for each folderId in the queue message (if any)
+
+  INSERT INTO AuditLog (Action='Tweet.Scraped', ...)
+COMMIT
+
+-- After commit only:
+queue.DeleteMessage(message)
+```
+
+### Failure Path (NotFound / Private / ScrapeFailed)
+
+```
+BEGIN TRANSACTION
+  INSERT INTO Tweets
+    (Id, XTweetId, XTweetUrl, FetchStatus=@status, ScrapeError=@error,
+     ScrapeAttempts, SubmittedByUserId, SubmittedByIp, CreatedAt)
+    -- scraped columns remain NULL; no FolderTweet rows inserted
+
+  INSERT INTO AuditLog (Action='Tweet.NotFound' | 'Tweet.Private' | 'Tweet.ScrapeFailed', ...)
 COMMIT
 
 -- After commit only:

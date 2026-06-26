@@ -1,3 +1,4 @@
+using Api.Extensions;
 using Api.Middleware;
 using Azure.Identity;
 using Azure.Monitor.OpenTelemetry.AspNetCore;
@@ -25,7 +26,10 @@ builder.Configuration.AddEnvironmentVariables();
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 
+builder.Services.AddApplicationServices(builder.Configuration);
 builder.Services.AddLoadShedding(builder.Configuration);
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
 
 builder.Services.AddAuthentication().AddJwtBearer();
 builder.Services.AddAuthorization();
@@ -67,6 +71,7 @@ if (builder.Environment.IsDevelopment())
 var app = builder.Build();
 
 app.UseMiddleware<CorrelationIdMiddleware>();
+app.UseExceptionHandler();
 app.UseMiddleware<HttpLoggingMiddleware>();
 app.UseRateLimiter();
 app.UseHttpsRedirection();
