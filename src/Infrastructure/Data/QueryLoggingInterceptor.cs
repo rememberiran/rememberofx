@@ -7,6 +7,9 @@ namespace Infrastructure.Data;
 
 public partial class QueryLoggingInterceptor : DbCommandInterceptor
 {
+    private static readonly EventId QueryCompletedEvent = new(3010, "EfQueryCompleted");
+    private static readonly EventId QueryFailedEvent = new(3011, "EfQueryFailed");
+
     private readonly ILogger<QueryLoggingInterceptor> _logger;
 
     public QueryLoggingInterceptor(ILogger<QueryLoggingInterceptor> logger)
@@ -85,6 +88,7 @@ public partial class QueryLoggingInterceptor : DbCommandInterceptor
         var latencyMs = eventData.Duration.TotalMilliseconds;
 
         _logger.LogInformation(
+            QueryCompletedEvent,
             "EF {Operation} on [{Tables}] completed in {LatencyMs:F1}ms (rows affected: {RowsAffected})",
             operation,
             tables,
@@ -100,6 +104,7 @@ public partial class QueryLoggingInterceptor : DbCommandInterceptor
         var latencyMs = eventData.Duration.TotalMilliseconds;
 
         _logger.LogWarning(
+            QueryFailedEvent,
             eventData.Exception,
             "EF {Operation} on [{Tables}] failed after {LatencyMs:F1}ms",
             operation,

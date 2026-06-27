@@ -17,6 +17,10 @@ public class AuthService : IAuthService
     private readonly IAppDbContext _db;
     private readonly IXApiClient _xApiClient;
     private readonly JwtSettings _jwt;
+    private static readonly EventId AuthDeniedEvent = new(1001, "AuthDenied");
+    private static readonly EventId DevTokenGeneratedEvent = new(1002, "DevTokenGenerated");
+    private static readonly EventId JwtGeneratedEvent = new(1003, "JwtGenerated");
+
     private readonly IAsyncContext<IdentityContext> _identityContext;
     private readonly ILogger<AuthService> _logger;
 
@@ -48,14 +52,14 @@ public class AuthService : IAuthService
         if (user is null)
         {
             WriteAuditLog($"Auth.Denied", xUser.Id, ipAddress);
-            _logger.LogWarning("Auth denied for unregistered X user {XUserId}", xUser.Id);
+            _logger.LogWarning(AuthDeniedEvent, "Auth denied for unregistered X user {XUserId}", xUser.Id);
             return Result.Failure<AuthTokenResult>(DomainError.Forbidden($"Access denied — your X account is not registered"));
         }
 
         if (!user.IsActive)
         {
             WriteAuditLog($"Auth.Denied", user.XUserId, ipAddress);
-            _logger.LogWarning("Auth denied for deactivated user {XUserId}", user.XUserId);
+            _logger.LogWarning(AuthDeniedEvent, "Auth denied for deactivated user {XUserId}", user.XUserId);
             return Result.Failure<AuthTokenResult>(DomainError.Forbidden($"User account is deactivated"));
         }
 
@@ -77,7 +81,7 @@ public class AuthService : IAuthService
             return Result.Failure<AuthTokenResult>(DomainError.NotFound($"User not found or inactive"));
         }
 
-        _logger.LogInformation("Dev token generated for user {XUserId}, role {Role}", user.XUserId, user.Role);
+        _logger.LogInformation(DevTokenGeneratedEvent, "Dev token generated for user {XUserId}, role {Role}", user.XUserId, user.Role);
 
         return Result.Success(GenerateJwt(user));
     }
@@ -107,7 +111,7 @@ public class AuthService : IAuthService
 
         var tokenString = new JwtSecurityTokenHandler().WriteToken(token);
 
-        _logger.LogInformation("JWT generated for user {XUserId}, role {Role}", user.XUserId, user.Role);
+        _logger.LogInformation(JwtGeneratedEvent, "JWT generated for user {XUserId}, role {Role}", user.XUserId, user.Role);
 
         return new AuthTokenResult(tokenString, expiresAt);
     }

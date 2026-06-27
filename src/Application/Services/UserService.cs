@@ -10,6 +10,10 @@ namespace Application.Services;
 public class UserService : IUserService
 {
     private readonly IAppDbContext _db;
+    private static readonly EventId UserAddedEvent = new(1010, "UserAdded");
+    private static readonly EventId UserUpdatedEvent = new(1011, "UserUpdated");
+    private static readonly EventId UserDeactivatedEvent = new(1012, "UserDeactivated");
+
     private readonly ILogger<UserService> _logger;
 
     public UserService(IAppDbContext db, ILogger<UserService> logger)
@@ -62,7 +66,7 @@ public class UserService : IUserService
 
         _db.Users.Add(user);
 
-        _logger.LogInformation("User added: {UserId}, XUserId: {XUserId}, Role: {Role}", user.Id, xUserId, role);
+        _logger.LogInformation(UserAddedEvent, "User added: {UserId}, XUserId: {XUserId}, Role: {Role}", user.Id, xUserId, role);
 
         return Result.Success(UserMapper.ToDomain(user));
     }
@@ -85,7 +89,7 @@ public class UserService : IUserService
             user.IsActive = isActive.Value;
         }
 
-        _logger.LogInformation("User updated: {UserId}, Role: {Role}, IsActive: {IsActive}", id, user.Role, user.IsActive);
+        _logger.LogInformation(UserUpdatedEvent, "User updated: {UserId}, Role: {Role}, IsActive: {IsActive}", id, user.Role, user.IsActive);
 
         return Result.Success(UserMapper.ToDomain(user));
     }
@@ -100,7 +104,7 @@ public class UserService : IUserService
 
         user.IsActive = false;
 
-        _logger.LogInformation("User deactivated: {UserId}", id);
+        _logger.LogInformation(UserDeactivatedEvent, "User deactivated: {UserId}", id);
 
         return Result.Success();
     }

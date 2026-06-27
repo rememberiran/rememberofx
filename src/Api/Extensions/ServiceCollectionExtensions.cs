@@ -5,6 +5,7 @@ using Application.Models;
 using Application.Services;
 using Infrastructure.BlobStorage;
 using Infrastructure.Data;
+using Infrastructure.Identity;
 using Infrastructure.Queue;
 using Infrastructure.XApi;
 using Microsoft.EntityFrameworkCore;
@@ -39,7 +40,8 @@ public static class ServiceCollectionExtensions
 
         services.AddHttpClient<IXApiClient, XApiClient>();
 
-        services.AddSingleton<IScrapeQueueService, ScrapeQueueService>();
+        services.AddSingleton<ITokenCredentialProvider, TokenCredentialProvider>();
+        services.AddSingleton<IQueueService, QueueService>();
         services.AddSingleton<IBlobStorageService, BlobStorageService>();
 
         services.AddSingleton<TweetDtoMapper>();

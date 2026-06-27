@@ -1,20 +1,20 @@
-﻿using Azure.Identity;
-using Azure.Monitor.OpenTelemetry.AspNetCore;
+﻿using Azure.Monitor.OpenTelemetry.AspNetCore;
 using Frontend.Components;
 using Frontend.Services;
+using Infrastructure.Identity;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var credential = new DefaultAzureCredential();
+var credentialProvider = new TokenCredentialProvider();
 
 var kvUri = builder.Configuration[$"KeyVault:Uri"];
 if (!string.IsNullOrEmpty(kvUri))
 {
     try
     {
-        builder.Configuration.AddAzureKeyVault(new Uri(kvUri), credential);
+        builder.Configuration.AddAzureKeyVault(new Uri(kvUri), credentialProvider.Credential);
     }
     catch (Exception ex)
     {

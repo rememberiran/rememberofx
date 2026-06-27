@@ -14,6 +14,11 @@ public class FolderService : IFolderService
     private readonly IAppDbContext _db;
     private readonly IAsyncContext<IdentityContext> _identityContext;
     private readonly FolderSettings _settings;
+    private static readonly EventId FolderCreatedEvent = new(1020, "FolderCreated");
+    private static readonly EventId FolderUpdatedEvent = new(1021, "FolderUpdated");
+    private static readonly EventId TweetAddedToFolderEvent = new(1022, "TweetAddedToFolder");
+    private static readonly EventId TweetRemovedFromFolderEvent = new(1023, "TweetRemovedFromFolder");
+
     private readonly ILogger<FolderService> _logger;
 
     public FolderService(
@@ -161,7 +166,7 @@ public class FolderService : IFolderService
 
         _db.Folders.Add(folder);
 
-        _logger.LogInformation("Folder created: {FolderId} by user {UserId}", folder.Id, userId);
+        _logger.LogInformation(FolderCreatedEvent, "Folder created: {FolderId} by user {UserId}", folder.Id, userId);
 
         return Result.Success(FolderMapper.ToDomain(folder));
     }
@@ -209,7 +214,7 @@ public class FolderService : IFolderService
             folder.Description = description;
         }
 
-        _logger.LogInformation("Folder updated: {FolderId}", id);
+        _logger.LogInformation(FolderUpdatedEvent, "Folder updated: {FolderId}", id);
 
         return Result.Success(FolderMapper.ToDomain(folder));
     }
@@ -253,7 +258,7 @@ public class FolderService : IFolderService
             AddedByUserId = userId.Value,
         });
 
-        _logger.LogInformation("Tweet {TweetId} added to folder {FolderId}", tweetId, folderId);
+        _logger.LogInformation(TweetAddedToFolderEvent, "Tweet {TweetId} added to folder {FolderId}", tweetId, folderId);
         return Result.Success();
     }
 
@@ -269,7 +274,7 @@ public class FolderService : IFolderService
 
         _db.FolderTweets.Remove(folderTweet);
 
-        _logger.LogInformation("Tweet {TweetId} removed from folder {FolderId}", tweetId, folderId);
+        _logger.LogInformation(TweetRemovedFromFolderEvent, "Tweet {TweetId} removed from folder {FolderId}", tweetId, folderId);
         return Result.Success();
     }
 

@@ -9,6 +9,8 @@ namespace Application.Services;
 public class VoteService : IVoteService
 {
     private readonly IAppDbContext _db;
+    private static readonly EventId VoteCastEvent = new(1030, "VoteCast");
+
     private readonly IAsyncContext<IdentityContext> _identityContext;
     private readonly ILogger<VoteService> _logger;
 
@@ -78,7 +80,7 @@ public class VoteService : IVoteService
             return Result.Failure(DomainError.Conflict($"Already voted"));
         }
 
-        _logger.LogInformation("Vote cast for tweet {TweetId} by {VoterIdentity}", tweetId, voterUserId?.ToString() ?? voterIp);
+        _logger.LogInformation(VoteCastEvent, "Vote cast for tweet {TweetId} by {VoterIdentity}", tweetId, voterUserId?.ToString() ?? voterIp);
         return Result.Success();
     }
 }

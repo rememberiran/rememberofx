@@ -11,6 +11,8 @@ namespace Application.Services;
 public class SearchService : ISearchService
 {
     private readonly IAppDbContext _db;
+    private static readonly EventId SearchCompletedEvent = new(1040, "SearchCompleted");
+
     private readonly ILogger<SearchService> _logger;
 
     public SearchService(IAppDbContext db, ILogger<SearchService> logger)
@@ -102,7 +104,7 @@ public class SearchService : ISearchService
             }
         }
 
-        _logger.LogInformation("Search completed: {TotalCount} results for query {Query}", totalCount, query);
+        _logger.LogInformation(SearchCompletedEvent, "Search completed: {TotalCount} results for query {Query}", totalCount, query);
 
         return Result.Success(new TweetSearchResult(items, totalCount, subjectProfile));
     }

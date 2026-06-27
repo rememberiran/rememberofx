@@ -4,6 +4,8 @@ namespace Api.Middleware;
 
 public class GlobalExceptionHandler : IExceptionHandler
 {
+    private static readonly EventId UnhandledExceptionEvent = new(2010, "UnhandledException");
+
     private readonly ILogger<GlobalExceptionHandler> _logger;
 
     public GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger)
@@ -16,6 +18,7 @@ public class GlobalExceptionHandler : IExceptionHandler
         var correlationId = httpContext.Items["CorrelationId"]?.ToString();
 
         _logger.LogError(
+            UnhandledExceptionEvent,
             exception,
             "Unhandled exception on {Method} {Path}. CorrelationId: {CorrelationId}",
             httpContext.Request.Method,

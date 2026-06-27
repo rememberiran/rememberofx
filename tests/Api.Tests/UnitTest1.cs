@@ -32,9 +32,11 @@ public class HealthEndpointTests
         public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }
 
-    private sealed class FakeQueueService : IScrapeQueueService
+    private sealed class FakeQueueService : IQueueService
     {
-        public Task EnqueueAsync(Application.Models.ScrapeJobMessage message, CancellationToken ct) => Task.CompletedTask;
+        public Task EnqueueAsync<T>(T message, CancellationToken ct) => Task.CompletedTask;
+        public Task<RawQueueMessage?> DequeueAsync(TimeSpan visibilityTimeout, CancellationToken ct) => Task.FromResult<RawQueueMessage?>(null);
+        public Task DeleteMessageAsync(string messageId, string popReceipt, CancellationToken ct) => Task.CompletedTask;
         public Task<bool> IsHealthyAsync(CancellationToken ct) => Task.FromResult(true);
     }
 }

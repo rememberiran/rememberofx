@@ -10,10 +10,13 @@ namespace Api.Controllers;
 public class HealthController : ControllerBase
 {
     private readonly IAppDbContext _db;
-    private readonly IScrapeQueueService _queue;
+    private readonly IQueueService _queue;
+    private static readonly EventId DbHealthCheckFailedEvent = new(2020, "DbHealthCheckFailed");
+    private static readonly EventId QueueHealthCheckFailedEvent = new(2021, "QueueHealthCheckFailed");
+
     private readonly ILogger<HealthController> _logger;
 
-    public HealthController(IAppDbContext db, IScrapeQueueService queue, ILogger<HealthController> logger)
+    public HealthController(IAppDbContext db, IQueueService queue, ILogger<HealthController> logger)
     {
         _db = db;
         _queue = queue;
@@ -41,7 +44,7 @@ public class HealthController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, $"Database health check failed");
+            _logger.LogWarning(DbHealthCheckFailedEvent, ex, $"Database health check failed");
         }
 
         try
@@ -50,7 +53,7 @@ public class HealthController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, $"Queue health check failed");
+            _logger.LogWarning(QueueHealthCheckFailedEvent, ex, $"Queue health check failed");
         }
 
         var ready = dbHealthy && queueHealthy;

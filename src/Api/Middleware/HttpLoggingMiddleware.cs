@@ -4,6 +4,9 @@ namespace Api.Middleware;
 
 public class HttpLoggingMiddleware
 {
+    private static readonly EventId HttpRequestEvent = new(2001, "HttpRequest");
+    private static readonly EventId HttpResponseEvent = new(2002, "HttpResponse");
+
     private readonly RequestDelegate _next;
     private readonly ILogger<HttpLoggingMiddleware> _logger;
 
@@ -20,6 +23,7 @@ public class HttpLoggingMiddleware
                         ?? "unknown";
 
         _logger.LogInformation(
+            HttpRequestEvent,
             "HTTP Request {Method} {Path}{QueryString} from {IpAddress}",
             context.Request.Method,
             context.Request.Path,
@@ -31,6 +35,7 @@ public class HttpLoggingMiddleware
         sw.Stop();
 
         _logger.LogInformation(
+            HttpResponseEvent,
             "HTTP Response {Method} {Path} -> {StatusCode} in {ElapsedMs}ms",
             context.Request.Method,
             context.Request.Path,

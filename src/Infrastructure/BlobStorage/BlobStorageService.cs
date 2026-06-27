@@ -10,10 +10,10 @@ public class BlobStorageService : IBlobStorageService
     private readonly BlobContainerClient _screenshotsContainer;
     private readonly BlobContainerClient _mediaContainer;
 
-    public BlobStorageService(IConfiguration configuration)
+    public BlobStorageService(IConfiguration configuration, ITokenCredentialProvider credentialProvider)
     {
         var accountUrl = configuration[$"BlobStorage:AccountUrl"]!;
-        var serviceClient = new BlobServiceClient(new Uri(accountUrl), new Azure.Identity.DefaultAzureCredential());
+        var serviceClient = new BlobServiceClient(new Uri(accountUrl), credentialProvider.Credential);
         _screenshotsContainer = serviceClient.GetBlobContainerClient($"screenshots");
         _mediaContainer = serviceClient.GetBlobContainerClient($"media");
     }
@@ -26,6 +26,29 @@ public class BlobStorageService : IBlobStorageService
     public string? GetMediaSasUrl(string? blobName)
     {
         return GenerateSasUrl(_mediaContainer, blobName);
+    }
+
+    public async Task<string> UploadScreenshotAsync(string blobName, ReadOnlyMemory<byte> data, string contentType, CancellationToken ct)
+    {
+        return await UploadAsync(_screenshotsContainer, blobName, data, contentType, ct);
+    }
+
+    public async Task<string> UploadMediaAsync(string blobName, ReadOnlyMemory<byte> data, string contentType, CancellationToken ct)
+    {
+        return await UploadAsync(_mediaContainer, blobName, data, contentType, ct);
+    }
+
+    private static async Task<string> UploadAsync(BlobContainerClient container, string blobName, ReadOnlyMemory<byte> data, string contentType, CancellationToken ct)
+    {
+        var blobClient = container.GetBlobClient(blobName);
+        await blobClient.UploadAsync(
+            new BinaryData(data),
+            new Azure.Storage.Blobs.Models.BlobUploadOptions
+            {
+                HttpHeaders = new Azure.Storage.Blobs.Models.BlobHttpHeaders { ContentType = contentType },
+            },
+            ct);
+        return blobName;
     }
 
     private static string? GenerateSasUrl(BlobContainerClient container, string? blobName)

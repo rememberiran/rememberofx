@@ -13,13 +13,16 @@ namespace Application.Services;
 public partial class TweetSubmissionService : ITweetSubmissionService
 {
     private readonly IAppDbContext _db;
-    private readonly IScrapeQueueService _queue;
+    private readonly IQueueService _queue;
     private readonly IAsyncContext<IdentityContext> _identityContext;
+    private static readonly EventId TweetSubmittedEvent = new(1050, "TweetSubmitted");
+    private static readonly EventId EnqueueFailedEvent = new(1051, "ScrapeEnqueueFailed");
+
     private readonly ILogger<TweetSubmissionService> _logger;
 
     public TweetSubmissionService(
         IAppDbContext db,
-        IScrapeQueueService queue,
+        IQueueService queue,
         IAsyncContext<IdentityContext> identityContext,
         ILogger<TweetSubmissionService> logger)
     {
@@ -102,10 +105,10 @@ public partial class TweetSubmissionService : ITweetSubmissionService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to enqueue scrape job for tweet {XTweetId}. Audit log recorded with CorrelationId {CorrelationId}", xTweetId, correlationId);
+            _logger.LogWarning(EnqueueFailedEvent, ex, "Failed to enqueue scrape job for tweet {XTweetId}. Audit log recorded with CorrelationId {CorrelationId}", xTweetId, correlationId);
         }
 
-        _logger.LogInformation("Tweet submitted: {TweetId}, XTweetId: {XTweetId}, CorrelationId: {CorrelationId}", tweetId, xTweetId, correlationId);
+        _logger.LogInformation(TweetSubmittedEvent, "Tweet submitted: {TweetId}, XTweetId: {XTweetId}, CorrelationId: {CorrelationId}", tweetId, xTweetId, correlationId);
 
         return Result.Success(TweetMapper.ToDomain(tweetRecord));
     }

@@ -10,6 +10,9 @@ namespace Application.Services;
 public class XUserProfileService : IXUserProfileService
 {
     private readonly IAppDbContext _db;
+    private static readonly EventId ProfileCreatedEvent = new(1060, "XUserProfileCreated");
+    private static readonly EventId ProfileUpdatedEvent = new(1061, "XUserProfileUpdated");
+
     private readonly ILogger<XUserProfileService> _logger;
 
     public XUserProfileService(IAppDbContext db, ILogger<XUserProfileService> logger)
@@ -49,7 +52,7 @@ public class XUserProfileService : IXUserProfileService
                 CreatedByUserId = updatedByUserId,
             };
             _db.XUserProfiles.Add(profile);
-            _logger.LogInformation("XUserProfile created for {XUserId}", xUserId);
+            _logger.LogInformation(ProfileCreatedEvent, "XUserProfile created for {XUserId}", xUserId);
         }
         else
         {
@@ -65,7 +68,7 @@ public class XUserProfileService : IXUserProfileService
 
             profile.UpdatedByUserId = updatedByUserId;
             profile.UpdatedAt = DateTime.UtcNow;
-            _logger.LogInformation("XUserProfile updated for {XUserId}", xUserId);
+            _logger.LogInformation(ProfileUpdatedEvent, "XUserProfile updated for {XUserId}", xUserId);
         }
 
         return Result.Success(XUserProfileMapper.ToDomain(profile));
