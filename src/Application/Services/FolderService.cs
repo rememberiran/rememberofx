@@ -39,10 +39,15 @@ public class FolderService : IFolderService
         var folders = await _db.Folders.AsNoTracking()
             .Include(f => f.CreatedByUser)
             .Where(f => f.ParentFolderId == null && f.IsActive)
-            .Select(f => new { Record = f, ChildCount = f.Children.Count(c => c.IsActive), TweetCount = f.FolderTweets.Count })
+            .Select(f => new { Record = f, ChildCount = f.Children.Count(c => c.IsActive) })
             .ToListAsync(ct);
 
-        return Result.Success(folders.Select(f => new FolderSummary(FolderMapper.ToDomain(f.Record), f.ChildCount, f.TweetCount)).ToList());
+        var folderIds = folders.Select(f => f.Record.Id).ToList();
+        var cumulativeCounts = await GetCumulativeTweetCountsAsync(folderIds, ct);
+
+        return Result.Success(folders
+            .Select(f => new FolderSummary(FolderMapper.ToDomain(f.Record), f.ChildCount, cumulativeCounts.GetValueOrDefault(f.Record.Id)))
+            .ToList());
     }
 
     public async Task<Result<List<FolderSummary>>> ListByCreatorAsync(Guid userId, CancellationToken ct)
@@ -54,14 +59,16 @@ public class FolderService : IFolderService
             {
                 Record = f,
                 ChildCount = f.Children.Count(c => c.IsActive),
-                TweetCount = f.FolderTweets.Count,
             })
             .ToListAsync(ct);
 
         _logger.LogInformation(FoldersListedByCreatorEvent, "Listed {FolderCount} folders for user {UserId}", folders.Count, userId);
 
+        var folderIds = folders.Select(f => f.Record.Id).ToList();
+        var cumulativeCounts = await GetCumulativeTweetCountsAsync(folderIds, ct);
+
         return Result.Success(folders
-            .Select(f => new FolderSummary(FolderMapper.ToDomain(f.Record), f.ChildCount, f.TweetCount))
+            .Select(f => new FolderSummary(FolderMapper.ToDomain(f.Record), f.ChildCount, cumulativeCounts.GetValueOrDefault(f.Record.Id)))
             .ToList());
     }
 
@@ -100,10 +107,15 @@ public class FolderService : IFolderService
         var children = await _db.Folders.AsNoTracking()
             .Include(f => f.CreatedByUser)
             .Where(f => f.ParentFolderId == id && f.IsActive)
-            .Select(f => new { Record = f, ChildCount = f.Children.Count(c => c.IsActive), TweetCount = f.FolderTweets.Count })
+            .Select(f => new { Record = f, ChildCount = f.Children.Count(c => c.IsActive) })
             .ToListAsync(ct);
 
-        return Result.Success(children.Select(f => new FolderSummary(FolderMapper.ToDomain(f.Record), f.ChildCount, f.TweetCount)).ToList());
+        var childIds = children.Select(f => f.Record.Id).ToList();
+        var cumulativeCounts = await GetCumulativeTweetCountsAsync(childIds, ct);
+
+        return Result.Success(children
+            .Select(f => new FolderSummary(FolderMapper.ToDomain(f.Record), f.ChildCount, cumulativeCounts.GetValueOrDefault(f.Record.Id)))
+            .ToList());
     }
 
     public async Task<Result<PagedResult<TweetWithAuthor>>> GetTweetsAsync(Guid folderId, string sort, int page, int pageSize, CancellationToken ct)
@@ -193,6 +205,31 @@ public class FolderService : IFolderService
 
         _db.Folders.Add(folder);
 
+        _db.FolderClosures.Add(new FolderClosureRecord
+        {
+            AncestorId = folder.Id,
+            DescendantId = folder.Id,
+            Depth = 0,
+        });
+
+        if (parentFolderId.HasValue)
+        {
+            var parentAncestors = await _db.FolderClosures
+                .AsNoTracking()
+                .Where(fc => fc.DescendantId == parentFolderId.Value)
+                .ToListAsync(ct);
+
+            foreach (var pa in parentAncestors)
+            {
+                _db.FolderClosures.Add(new FolderClosureRecord
+                {
+                    AncestorId = pa.AncestorId,
+                    DescendantId = folder.Id,
+                    Depth = pa.Depth + 1,
+                });
+            }
+        }
+
         _logger.LogInformation(FolderCreatedEvent, "Folder created: {FolderId} by user {UserId}", folder.Id, userId);
 
         return Result.Success(FolderMapper.ToDomain(folder));
@@ -211,9 +248,11 @@ public class FolderService : IFolderService
 
         if (parentFolderId.HasValue && parentFolderId != folder.ParentFolderId)
         {
-            if (parentFolderId == id)
+            var wouldCycle = await _db.FolderClosures
+                .AnyAsync(fc => fc.AncestorId == id && fc.DescendantId == parentFolderId.Value, ct);
+            if (wouldCycle)
             {
-                return Result.Failure<Folder>(DomainError.Validation($"A folder cannot be its own parent"));
+                return Result.Failure<Folder>(DomainError.Validation("Cannot move a folder under one of its own descendants"));
             }
 
             var parent = await _db.Folders.AsNoTracking().FirstOrDefaultAsync(f => f.Id == parentFolderId && f.IsActive, ct);
@@ -226,6 +265,40 @@ public class FolderService : IFolderService
             if (depth + 1 > _settings.MaxDepth)
             {
                 return Result.Failure<Folder>(DomainError.Validation($"Maximum folder depth of {_settings.MaxDepth} exceeded"));
+            }
+
+            var subtreeDescendantIds = await _db.FolderClosures
+                .Where(fc => fc.AncestorId == id)
+                .Select(fc => fc.DescendantId)
+                .ToListAsync(ct);
+
+            var subtreeRelativeDepths = await _db.FolderClosures
+                .Where(fc => fc.AncestorId == id && subtreeDescendantIds.Contains(fc.DescendantId))
+                .ToDictionaryAsync(fc => fc.DescendantId, fc => fc.Depth, ct);
+
+            var oldPaths = await _db.FolderClosures
+                .Where(fc => subtreeDescendantIds.Contains(fc.DescendantId)
+                          && !subtreeDescendantIds.Contains(fc.AncestorId))
+                .ToListAsync(ct);
+
+            _db.FolderClosures.RemoveRange(oldPaths);
+
+            var newParentAncestors = await _db.FolderClosures
+                .AsNoTracking()
+                .Where(fc => fc.DescendantId == parentFolderId.Value)
+                .ToListAsync(ct);
+
+            foreach (var ancestor in newParentAncestors)
+            {
+                foreach (var (descendantId, relativeDepth) in subtreeRelativeDepths)
+                {
+                    _db.FolderClosures.Add(new FolderClosureRecord
+                    {
+                        AncestorId = ancestor.AncestorId,
+                        DescendantId = descendantId,
+                        Depth = ancestor.Depth + 1 + relativeDepth,
+                    });
+                }
             }
 
             folder.ParentFolderId = parentFolderId;
@@ -348,17 +421,39 @@ public class FolderService : IFolderService
         return breadcrumbs[^1];
     }
 
-    private async Task<int> GetDepthAsync(Guid? parentFolderId, CancellationToken ct)
+    private async Task<Dictionary<Guid, int>> GetCumulativeTweetCountsAsync(List<Guid> folderIds, CancellationToken ct)
     {
-        var depth = 0;
-        var currentId = parentFolderId;
-        while (currentId != null)
+        if (folderIds.Count == 0)
         {
-            depth++;
-            var parent = await _db.Folders.AsNoTracking().FirstOrDefaultAsync(f => f.Id == currentId, ct);
-            currentId = parent?.ParentFolderId;
+            return new Dictionary<Guid, int>();
         }
 
-        return depth;
+        return await _db.FolderClosures
+            .Where(fc => folderIds.Contains(fc.AncestorId))
+            .Join(
+                _db.Folders.Where(f => f.IsActive),
+                fc => fc.DescendantId,
+                f => f.Id,
+                (fc, f) => new { fc.AncestorId, FolderId = f.Id })
+            .Join(
+                _db.FolderTweets,
+                x => x.FolderId,
+                ft => ft.FolderId,
+                (x, ft) => new { x.AncestorId, ft.TweetId })
+            .GroupBy(x => x.AncestorId)
+            .Select(g => new { FolderId = g.Key, Count = g.Select(x => x.TweetId).Distinct().Count() })
+            .ToDictionaryAsync(x => x.FolderId, x => x.Count, ct);
+    }
+
+    private async Task<int> GetDepthAsync(Guid? parentFolderId, CancellationToken ct)
+    {
+        if (!parentFolderId.HasValue)
+        {
+            return 0;
+        }
+
+        return await _db.FolderClosures
+            .Where(fc => fc.DescendantId == parentFolderId.Value)
+            .MaxAsync(fc => fc.Depth, ct) + 1;
     }
 }

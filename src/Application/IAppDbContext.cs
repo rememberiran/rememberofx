@@ -15,6 +15,7 @@ public interface IAppDbContext
     DbSet<VoteRecord> Votes { get; }
     DbSet<TweetMediaRecord> TweetMedia { get; }
     DbSet<AuditLogRecord> AuditLogs { get; }
+    DbSet<FolderClosureRecord> FolderClosures { get; }
     DatabaseFacade Database { get; }
     ChangeTracker ChangeTracker { get; }
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);

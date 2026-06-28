@@ -18,6 +18,7 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<VoteRecord> Votes => Set<VoteRecord>();
     public DbSet<TweetMediaRecord> TweetMedia => Set<TweetMediaRecord>();
     public DbSet<AuditLogRecord> AuditLogs => Set<AuditLogRecord>();
+    public DbSet<FolderClosureRecord> FolderClosures => Set<FolderClosureRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -75,6 +76,21 @@ public class AppDbContext : DbContext, IAppDbContext
         {
             e.ToTable($"FolderTweets");
             e.HasKey(ft => new { ft.FolderId, ft.TweetId });
+        });
+
+        modelBuilder.Entity<FolderClosureRecord>(e =>
+        {
+            e.ToTable("FolderClosures");
+            e.HasKey(fc => new { fc.AncestorId, fc.DescendantId });
+            e.HasIndex(fc => fc.DescendantId);
+            e.HasOne(fc => fc.Ancestor)
+             .WithMany()
+             .HasForeignKey(fc => fc.AncestorId)
+             .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(fc => fc.Descendant)
+             .WithMany()
+             .HasForeignKey(fc => fc.DescendantId)
+             .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<TweetMediaRecord>(e =>
