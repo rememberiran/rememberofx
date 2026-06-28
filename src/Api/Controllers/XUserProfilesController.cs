@@ -35,7 +35,19 @@ public class XUserProfilesController : ControllerBase
             return result.ToActionResult();
         }
 
-        var dto = XUserProfileDtoMapper.ToDto(result.Value!);
+        var statsResult = await _profileService.GetAuthorStatsAsync(result.Value!.XUserId, ct);
+
+        if (!statsResult.IsSuccess)
+        {
+            return statsResult.ToActionResult();
+        }
+
+        var stats = statsResult.Value!;
+        var dto = XUserProfileDtoMapper.ToDto(
+            result.Value!,
+            stats.ArchivedTweetCount,
+            stats.TotalVotesReceived,
+            stats.FirstArchivedAt);
         return Ok(dto);
     }
 

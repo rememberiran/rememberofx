@@ -1,6 +1,7 @@
 ﻿using Azure.Monitor.OpenTelemetry.AspNetCore;
 using Frontend.Components;
 using Frontend.Services;
+using Frontend.Services.Orchestrators;
 using Infrastructure.Identity;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
@@ -34,6 +35,16 @@ builder.Services.AddHttpClient<ApiClient>(client =>
 }).AddHttpMessageHandler<LoggingDelegatingHandler>();
 
 builder.Services.AddTransient<LoggingDelegatingHandler>();
+
+builder.Services.AddScoped<HomeOrchestrator>();
+builder.Services.AddScoped<BrowseOrchestrator>();
+builder.Services.AddScoped<FolderDetailOrchestrator>();
+builder.Services.AddScoped<TweetDetailOrchestrator>();
+builder.Services.AddScoped<SearchOrchestrator>();
+builder.Services.AddScoped<SubmitOrchestrator>();
+builder.Services.AddScoped<AdminOrchestrator>();
+builder.Services.AddScoped<ProfileOrchestrator>();
+builder.Services.AddScoped<MyArchiveOrchestrator>();
 
 var otel = builder.Services.AddOpenTelemetry();
 otel.WithTracing(t =>

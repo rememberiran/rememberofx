@@ -1,0 +1,227 @@
+@page "/admin"
+@rendermode InteractiveServer
+
+<PageTitle>User Management</PageTitle>
+
+<div class="mox-container" style="padding-top: 32px; padding-bottom: 64px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+        <h1 style="font-family: var(--mox-font-serif); font-size: 30px; font-weight: 800; color: var(--mox-ink); margin: 0;">
+            User Management
+        </h1>
+        <button class="mox-btn-primary" style="display: inline-flex; align-items: center; gap: 6px;" @onclick="OpenAddModal">
+            <i class="bi bi-plus-lg"></i> Add User
+        </button>
+    </div>
+
+    @if (_loading)
+    {
+        <LoadingSkeleton Count="6" />
+    }
+    else if (_model is not null)
+    {
+        @if (_selectedUsers.Count > 0)
+        {
+            <div class="batch-bar">
+                <span style="font-size: 14px; font-weight: 600; color: var(--mox-ink);">
+                    @_selectedUsers.Count selected
+                </span>
+                <button class="mox-btn-secondary" style="padding: 4px 12px; font-size: 13px;">Activate</button>
+                <button class="mox-btn-secondary" style="padding: 4px 12px; font-size: 13px;">Deactivate</button>
+                <button style="padding: 4px 12px; font-size: 13px; background: none; border: none; color: var(--mox-muted); cursor: pointer;"
+                        @onclick="ClearSelection">
+                    Clear
+                </button>
+            </div>
+        }
+
+        <div class="admin-table-wrapper">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th style="width: 40px;">
+                            <input type="checkbox"
+                                   @onchange="ToggleSelectAll"
+                                   checked="@(_selectedUsers.Count == _model.Users.Count && _model.Users.Count > 0)" />
+                        </th>
+                        <th>X Username</th>
+                        <th>X User ID</th>
+                        <th>Role</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var user in _model.Users)
+                    {
+                        <tr>
+                            <td>
+                                <input type="checkbox"
+                                       checked="@_selectedUsers.Contains(user.Id)"
+                                       @onchange="@(e => ToggleUser(user.Id, (bool)(e.Value ?? false)))" />
+                            </td>
+                            <td style="font-weight: 600;">@user.XUsername</td>
+                            <td>
+                                <span class="mox-mono" style="font-size: 12px; color: var(--mox-muted);">
+                                    @user.XUserId
+                                </span>
+                            </td>
+                            <td>
+                                <span class="role-badge role-@user.Role.ToLowerInvariant()">
+                                    @user.Role
+                                </span>
+                            </td>
+                            <td>
+                                <span class="status-badge status-@user.Status.ToLowerInvariant()">
+                                    @user.Status
+                                </span>
+                            </td>
+                            <td style="font-size: 13px; color: var(--mox-muted);">@user.Created</td>
+                            <td>
+                                <div style="display: flex; gap: 6px;">
+                                    <button class="action-btn" @onclick="@(() => OpenEditModal(user))">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <button class="action-btn" style="color: var(--mox-danger-text);">
+                                        <i class="bi bi-slash-circle"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        @if (_model.Users.Count == 0)
+        {
+            <EmptyState Icon="bi-people"
+                        Title="No users yet"
+                        Description="Add users to manage access to the archive." />
+        }
+    }
+</div>
+
+@if (_modalOpen)
+{
+    <div class="modal-overlay" @onclick="CloseModal">
+        <div class="modal-card" @onclick:stopPropagation="true">
+            <h2 style="font-family: var(--mox-font-serif); font-size: 20px; font-weight: 700; color: var(--mox-ink); margin: 0 0 20px;">
+                @(_editingUser is not null ? "Edit User" : "Add User")
+            </h2>
+
+            <div style="margin-bottom: 16px;">
+                <label style="display: block; font-size: 13px; font-weight: 600; color: var(--mox-ink); margin-bottom: 6px;">
+                    X User ID
+                </label>
+                <input type="text"
+                       class="mox-input"
+                       style="width: 100%;"
+                       placeholder="Enter X User ID..."
+                       @bind="_modalXUserId"
+                       disabled="@(_editingUser is not null)" />
+            </div>
+
+            <div style="margin-bottom: 24px;">
+                <label style="display: block; font-size: 13px; font-weight: 600; color: var(--mox-ink); margin-bottom: 6px;">
+                    Role
+                </label>
+                <select class="mox-input" style="width: 100%;" @bind="_modalRole">
+                    <option value="Viewer">Viewer</option>
+                    <option value="Contributor">Contributor</option>
+                    <option value="Admin">Admin</option>
+                </select>
+            </div>
+
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button class="mox-btn-secondary" @onclick="CloseModal">Cancel</button>
+                <button class="mox-btn-primary" @onclick="SaveUser">Save</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private AdminPageModel? _model;
+    private bool _loading = true;
+    private readonly HashSet<Guid> _selectedUsers = new();
+    private bool _modalOpen;
+    private UserViewModel? _editingUser;
+    private string _modalXUserId = "";
+    private string _modalRole = "Viewer";
+
+    [Inject]
+    private AdminOrchestrator Orchestrator { get; set; } = default!;
+
+    [Inject]
+    private ApiClient Api { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _model = await Orchestrator.GetAsync();
+        _loading = false;
+    }
+
+    private void ToggleUser(Guid userId, bool isChecked)
+    {
+        if (isChecked)
+        {
+            _selectedUsers.Add(userId);
+        }
+        else
+        {
+            _selectedUsers.Remove(userId);
+        }
+    }
+
+    private void ToggleSelectAll(ChangeEventArgs e)
+    {
+        if (_model is null)
+        {
+            return;
+        }
+
+        var isChecked = (bool)(e.Value ?? false);
+        _selectedUsers.Clear();
+        if (isChecked)
+        {
+            foreach (var user in _model.Users)
+            {
+                _selectedUsers.Add(user.Id);
+            }
+        }
+    }
+
+    private void ClearSelection()
+    {
+        _selectedUsers.Clear();
+    }
+
+    private void OpenAddModal()
+    {
+        _editingUser = null;
+        _modalXUserId = "";
+        _modalRole = "Viewer";
+        _modalOpen = true;
+    }
+
+    private void OpenEditModal(UserViewModel user)
+    {
+        _editingUser = user;
+        _modalXUserId = user.XUserId;
+        _modalRole = user.Role;
+        _modalOpen = true;
+    }
+
+    private void CloseModal()
+    {
+        _modalOpen = false;
+        _editingUser = null;
+    }
+
+    private async Task SaveUser()
+    {
+        CloseModal();
+        await Task.CompletedTask;
+    }
+}

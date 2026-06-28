@@ -1,7 +1,112 @@
 @page "/"
+@rendermode InteractiveServer
 
 <PageTitle>Memory of X</PageTitle>
 
-<h1>Memory of X</h1>
+@if (_loading)
+{
+    <LoadingSkeleton Count="6" />
+}
+else if (_model is not null)
+{
+    <section class="hero-section">
+        <div class="hero-content">
+            <h1 class="hero-title">Memory of X</h1>
+            <p class="hero-subtitle">Archiving tweets before they disappear</p>
 
-<p>Capturing, archiving, and surfacing tweets as a public record.</p>
+            <div class="hero-search">
+                <div class="hero-search-inner">
+                    <i class="bi bi-search hero-search-icon"></i>
+                    <input type="text"
+                           class="hero-search-input"
+                           placeholder="Search archived tweets..."
+                           @bind="_searchQuery"
+                           @onkeydown="HandleSearchKeyDown" />
+                    <button class="mox-btn-primary hero-search-btn" @onclick="NavigateToSearch">
+                        Search
+                    </button>
+                </div>
+            </div>
+
+            <div class="hero-ctas">
+                <a href="/submit" class="hero-cta-primary">
+                    Submit a Tweet <i class="bi bi-arrow-right"></i>
+                </a>
+                <a href="/browse" class="hero-cta-secondary">
+                    <i class="bi bi-collection"></i> Browse Collections
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <section class="mox-container" style="padding-top: 48px;">
+        <div class="section-header">
+            <h2 class="section-title">Browse Collections</h2>
+            <p class="section-subtitle">Curated folders of archived public discourse</p>
+        </div>
+
+        <div class="mox-grid-3">
+            @foreach (var folder in _model.Folders)
+            {
+                <FolderCard Folder="@folder" />
+            }
+        </div>
+    </section>
+
+    <section class="mox-container" style="padding-top: 44px; padding-bottom: 64px;">
+        <div class="section-header">
+            <h2 class="section-title">Most Voted</h2>
+            <p class="section-subtitle">The archive's most-supported tweets</p>
+        </div>
+
+        @foreach (var tweet in _model.TopVotedTweets.Take(4))
+        {
+            <div style="margin-bottom: 16px;">
+                <TweetCard Tweet="@tweet"
+                           ShowScreenshot="true"
+                           ShowCapture="true"
+                           ShowFolders="true"
+                           OnVote="@(() => HandleVote(tweet.Id))" />
+            </div>
+        }
+    </section>
+}
+
+@code {
+    private HomePageModel? _model;
+    private bool _loading = true;
+    private string _searchQuery = "";
+
+    [Inject]
+    private HomeOrchestrator Orchestrator { get; set; } = default!;
+
+    [Inject]
+    private NavigationManager Navigation { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _model = await Orchestrator.GetAsync();
+        _loading = false;
+    }
+
+    private void NavigateToSearch()
+    {
+        if (!string.IsNullOrWhiteSpace(_searchQuery))
+        {
+            Navigation.NavigateTo($"/search?q={Uri.EscapeDataString(_searchQuery)}");
+        }
+    }
+
+    private void HandleSearchKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            NavigateToSearch();
+        }
+    }
+
+    private async Task HandleVote(Guid tweetId)
+    {
+        await Task.CompletedTask;
+    }
+}

@@ -17,7 +17,11 @@ public class TweetQueryService : ITweetQueryService
 
     public async Task<Result<TweetWithAuthor>> GetByIdAsync(Guid id, CancellationToken ct)
     {
-        var tweet = await _db.Tweets.AsNoTracking().FirstOrDefaultAsync(t => t.Id == id, ct);
+        var tweet = await _db.Tweets.AsNoTracking()
+            .Include(t => t.SubmittedByUser)
+            .Include(t => t.FolderTweets)
+                .ThenInclude(ft => ft.Folder)
+            .FirstOrDefaultAsync(t => t.Id == id, ct);
         if (tweet is null)
         {
             return Result.Failure<TweetWithAuthor>(DomainError.NotFound($"Tweet not found"));

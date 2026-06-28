@@ -1,0 +1,175 @@
+@page "/u/{XUserId}"
+@rendermode InteractiveServer
+
+@if (_model is not null)
+{
+    <PageTitle>@@@_model.Profile.XUsername</PageTitle>
+}
+else
+{
+    <PageTitle>Profile</PageTitle>
+}
+
+@if (_loading)
+{
+    <div class="mox-container-narrow" style="padding-top: 32px;">
+        <LoadingSkeleton Count="4" />
+    </div>
+}
+else if (_model is not null)
+{
+    <div class="mox-container-narrow" style="padding-top: 32px; padding-bottom: 64px;">
+        <Breadcrumbs Items="@_breadcrumb" />
+
+        <!-- Profile header card -->
+        <div class="profile-card">
+            <div class="profile-banner"></div>
+            <div class="profile-body">
+                <div class="profile-avatar">
+                    @GetInitial(_model.Profile.XUsername)
+                </div>
+                <div class="profile-name-row">
+                    <div>
+                        <h1 class="profile-display-name">
+                            @(_model.Profile.DisplayName ?? $"@{_model.Profile.XUsername}")
+                        </h1>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span class="mox-chip" style="background: var(--mox-success-bg); color: var(--mox-success-text); border: 1px solid var(--mox-success-border); font-size: 11px;">
+                                Archived
+                            </span>
+                            <span style="font-size: 14px; color: var(--mox-muted);">@@@_model.Profile.XUsername</span>
+                        </div>
+                    </div>
+                    <a href="https://x.com/@_model.Profile.XUsername"
+                       target="_blank"
+                       rel="noopener"
+                       class="view-on-x-btn">
+                        <i class="bi bi-box-arrow-up-right"></i> View on X
+                    </a>
+                </div>
+
+                @if (!string.IsNullOrEmpty(_model.Profile.Description))
+                {
+                    <p style="font-size: 15px; color: var(--mox-ink); margin: 16px 0 0; line-height: 1.5;">
+                        @_model.Profile.Description
+                    </p>
+                }
+
+                <div class="profile-stats">
+                    <div class="stat-item">
+                        <span class="stat-value">@_model.Profile.ArchivedTweetCount</span>
+                        <span class="stat-label">Archived tweets</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value mox-text-accent">@_model.Profile.TotalVotes</span>
+                        <span class="stat-label">Total votes</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value">@(_model.Profile.FirstArchivedDate ?? "N/A")</span>
+                        <span class="stat-label">First archived</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value mox-mono" style="font-size: 12px;">@_model.Profile.XUserId</span>
+                        <span class="stat-label">X User ID</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tweets list -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin: 28px 0 20px;">
+            <h2 style="font-family: var(--mox-font-serif); font-size: 20px; font-weight: 700; color: var(--mox-ink); margin: 0;">
+                Archived Tweets
+            </h2>
+            <select class="mox-input" style="width: auto; padding: 6px 12px; font-size: 13px;" @bind="_sort" @bind:after="ReloadData">
+                <option value="votes">Most Voted</option>
+                <option value="newest">Newest</option>
+                <option value="oldest">Oldest</option>
+            </select>
+        </div>
+
+        @if (_model.Tweets.Count > 0)
+        {
+            @foreach (var tweet in _model.Tweets)
+            {
+                <div style="margin-bottom: 16px;">
+                    <TweetCard Tweet="@tweet"
+                               ShowScreenshot="true"
+                               ShowCapture="true"
+                               ShowFolders="true"
+                               OnVote="@(() => HandleVote(tweet.Id))" />
+                </div>
+            }
+
+            <Pagination CurrentPage="@_model.CurrentPage"
+                        TotalPages="@_model.TotalPages"
+                        OnPageChange="@HandlePageChange" />
+        }
+        else
+        {
+            <EmptyState Icon="bi-chat-square-text"
+                        Title="No archived tweets"
+                        Description="No tweets from this account have been archived yet." />
+        }
+    </div>
+}
+
+@code {
+    private ProfilePageModel? _model;
+    private bool _loading = true;
+    private string _sort = "votes";
+    private int _page = 1;
+    private const int PageSize = 20;
+    private List<BreadcrumbItemViewModel> _breadcrumb = new();
+
+    [Parameter]
+    public string XUserId { get; set; } = "";
+
+    [Inject]
+    private ProfileOrchestrator Orchestrator { get; set; } = default!;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _loading = true;
+        _model = await Orchestrator.GetAsync(XUserId, _sort, _page, PageSize);
+
+        if (_model is not null)
+        {
+            _breadcrumb = new List<BreadcrumbItemViewModel>
+            {
+                new("Home", "/"),
+                new("People", null),
+                new($"@{_model.Profile.XUsername}", null),
+            };
+        }
+
+        _loading = false;
+    }
+
+    private async Task ReloadData()
+    {
+        _page = 1;
+        await LoadData();
+    }
+
+    private async Task HandlePageChange(int page)
+    {
+        _page = page;
+        await LoadData();
+    }
+
+    private async Task HandleVote(Guid tweetId)
+    {
+        await Task.CompletedTask;
+    }
+
+    private static string GetInitial(string name)
+    {
+        return string.IsNullOrEmpty(name) ? "?" : name[..1].ToUpperInvariant();
+    }
+}

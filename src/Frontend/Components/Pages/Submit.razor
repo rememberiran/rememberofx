@@ -1,0 +1,446 @@
+@page "/submit"
+@rendermode InteractiveServer
+
+<PageTitle>Submit a Tweet</PageTitle>
+
+<div class="mox-container-narrow" style="padding-top: 32px; padding-bottom: 64px; max-width: 680px; margin: 0 auto;">
+    <h1 style="font-family: var(--mox-font-serif); font-size: 30px; font-weight: 800; color: var(--mox-ink); margin: 0 0 8px;">
+        Submit a Tweet
+    </h1>
+    <p style="color: var(--mox-muted); font-size: 15px; margin: 0 0 28px;">
+        Paste a tweet URL to archive it
+    </p>
+
+    @if (_submitState == SubmitState.Form)
+    {
+        @if (_loading)
+        {
+            <LoadingSkeleton Count="2" />
+        }
+        else if (_model is not null)
+        {
+            <div class="submit-card">
+                <div style="margin-bottom: 20px;">
+                    <label class="field-label">
+                        Tweet URL <span style="color: var(--mox-accent);">*</span>
+                    </label>
+                    <input type="url"
+                           class="mox-input"
+                           placeholder="https://x.com/username/status/..."
+                           @bind="_tweetUrl" />
+                </div>
+
+                <div style="margin-bottom: 24px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                        <label class="field-label" style="margin-bottom: 0;">Add to folders</label>
+                        @if (_selectedFolders.Count > 0)
+                        {
+                            <span style="font-size: 12px; font-weight: 600; color: var(--mox-accent);">@_selectedFolders.Count selected</span>
+                        }
+                    </div>
+
+                    @if (_selectedFolders.Count > 0)
+                    {
+                        <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px;">
+                            @foreach (var id in _selectedFolders.ToList())
+                            {
+                                var folder = _model.AvailableFolders.FirstOrDefault(f => f.Id == id);
+                                if (folder is not null)
+                                {
+                                    <span class="selected-chip">
+                                        <i class="bi bi-folder-fill" style="color: var(--mox-accent); font-size: 12px;"></i>
+                                        @folder.Name
+                                        <i class="bi bi-x" style="cursor: pointer; color: var(--mox-muted-light); font-size: 16px; line-height: 1;"
+                                           @onclick="@(() => _selectedFolders.Remove(id))"></i>
+                                    </span>
+                                }
+                            }
+                        </div>
+                    }
+
+                    <div class="folder-search-bar">
+                        <i class="bi bi-search" style="color: var(--mox-muted-light); font-size: 13px;"></i>
+                        <input type="text"
+                               placeholder="Search folders..."
+                               @bind="_folderSearch"
+                               @bind:event="oninput" />
+                    </div>
+
+                    <div class="folder-list">
+                        <div class="folder-list-label">@(string.IsNullOrWhiteSpace(_folderSearch) ? "Top folders" : $"{FilteredFolders.Count} matches")</div>
+                        @foreach (var folder in FilteredFolders)
+                        {
+                            var isSelected = _selectedFolders.Contains(folder.Id);
+                            <div class="folder-option" @onclick="@(() => ToggleFolder(folder.Id, !isSelected))">
+                                <i class="bi @(isSelected ? "bi-check-square-fill" : "bi-square")"
+                                   style="font-size: 17px; color: @(isSelected ? "var(--mox-accent)" : "var(--mox-faint)");"></i>
+                                <span style="flex: 1; font-size: 14px; color: var(--mox-ink);">@folder.Name</span>
+                                <span style="font-size: 12px; color: var(--mox-muted-light);">@folder.TweetCount tweets</span>
+                            </div>
+                        }
+                        @if (FilteredFolders.Count == 0)
+                        {
+                            <p style="font-size: 13px; color: var(--mox-muted-light); padding: 18px; margin: 0; text-align: center;">
+                                No folders match "@_folderSearch".
+                            </p>
+                        }
+                    </div>
+                </div>
+
+                <button class="mox-btn-primary"
+                        style="width: 100%; padding: 14px; font-size: 15px; font-weight: 700;"
+                        disabled="@(string.IsNullOrWhiteSpace(_tweetUrl))"
+                        @onclick="HandleSubmit">
+                    <i class="bi bi-archive"></i> Archive Tweet
+                </button>
+            </div>
+        }
+    }
+    else if (_submitState == SubmitState.Processing)
+    {
+        <div class="submit-card">
+            <div style="font-size: 13px; font-weight: 700; color: var(--mox-muted); margin-bottom: 14px;">Processing@("…")</div>
+
+            @foreach (var step in _steps)
+            {
+                @if (step.State == StepState.Done)
+                {
+                    <div class="process-step completed">
+                        <i class="bi bi-check-circle-fill" style="color: var(--mox-success-text);"></i>
+                        <span>@step.Label</span>
+                    </div>
+                }
+                else if (step.State == StepState.Active)
+                {
+                    @if (step.ShowCapture)
+                    {
+                        <div class="capture-stage">
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 11px;">
+                                <div style="display: flex; align-items: center; gap: 9px; font-size: 14px; font-weight: 700; color: var(--mox-ink);">
+                                    <i class="bi bi-camera-fill" style="color: var(--mox-accent);"></i> @step.Label
+                                </div>
+                                <span style="font-size: 12px; font-weight: 700; color: var(--mox-accent); font-family: var(--mox-font-mono);">@(_progressPercent)%</span>
+                            </div>
+                            <div style="display: flex; gap: 13px; align-items: stretch;">
+                                <div class="capture-preview">
+                                    <div class="scanline"></div>
+                                    <div class="capture-preview-label">live capture</div>
+                                </div>
+                                <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 9px; min-width: 0;">
+                                    <div class="progress-bar-container">
+                                        <div class="progress-bar-fill" style="width: @(_progressPercent)%;"></div>
+                                    </div>
+                                    <div style="font-size: 11.5px; color: var(--mox-muted); line-height: 1.4;">
+                                        Rendering a full-page snapshot — the permanent copy, preserved before the post can be edited or deleted.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="process-step active">
+                            <div class="spinner"></div>
+                            <span>@step.Label</span>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="process-step pending">
+                        <i class="bi bi-circle" style="color: var(--mox-muted-light);"></i>
+                        <span>@step.Label</span>
+                    </div>
+                }
+            }
+        </div>
+    }
+    else if (_submitState == SubmitState.Success)
+    {
+        <div class="result-card success">
+            <div style="display: flex; align-items: center; gap: 9px; font-size: 15px; font-weight: 700; color: var(--mox-success-text); margin-bottom: 14px;">
+                <i class="bi bi-check-circle-fill"></i> Tweet archived successfully!
+            </div>
+            <div style="display: flex; gap: 10px;">
+                @if (_submittedTweetId is not null)
+                {
+                    <a href="/t/@_submittedTweetId" class="mox-btn-primary" style="text-decoration: none;">View Tweet</a>
+                }
+                <button class="mox-btn-secondary" @onclick="ResetForm">Submit Another</button>
+            </div>
+        </div>
+    }
+    else if (_submitState == SubmitState.Error)
+    {
+        <div class="result-card error">
+            <div style="display: flex; align-items: center; gap: 9px; font-size: 15px; font-weight: 700; color: var(--mox-danger-text); margin-bottom: 14px;">
+                <i class="bi bi-exclamation-triangle-fill"></i> @_errorMessage
+            </div>
+            <button class="mox-btn-primary" @onclick="ResetForm">Try Again</button>
+        </div>
+    }
+</div>
+
+@code {
+    private SubmitPageModel? _model;
+    private bool _loading = true;
+    private string _tweetUrl = "";
+    private string _folderSearch = "";
+    private readonly HashSet<Guid> _selectedFolders = new();
+    private SubmitState _submitState = SubmitState.Form;
+    private Guid? _submittedTweetId;
+    private string _errorMessage = "Scrape failed: Tweet not found (may be deleted or private)";
+    private int _progressPercent;
+    private CancellationTokenSource? _pollCts;
+
+    private List<ProcessStep> _steps = BuildInitialSteps();
+
+    [Inject]
+    private SubmitOrchestrator Orchestrator { get; set; } = default!;
+
+    [Inject]
+    private ApiClient Api { get; set; } = default!;
+
+    private List<FolderOptionViewModel> FilteredFolders =>
+        _model?.AvailableFolders
+            .Where(f => string.IsNullOrWhiteSpace(_folderSearch)
+                || f.Name.Contains(_folderSearch, StringComparison.OrdinalIgnoreCase))
+            .ToList() ?? new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _model = await Orchestrator.GetAsync();
+        _loading = false;
+    }
+
+    private void ToggleFolder(Guid folderId, bool isSelected)
+    {
+        if (isSelected)
+        {
+            _selectedFolders.Add(folderId);
+        }
+        else
+        {
+            _selectedFolders.Remove(folderId);
+        }
+    }
+
+    private async Task HandleSubmit()
+    {
+        if (string.IsNullOrWhiteSpace(_tweetUrl))
+        {
+            return;
+        }
+
+        _steps = BuildInitialSteps();
+        _progressPercent = 0;
+        _submitState = SubmitState.Processing;
+        StateHasChanged();
+
+        var folderIds = _selectedFolders.Count > 0 ? _selectedFolders.ToList() : null;
+        var response = await Api.SubmitTweetAsync(_tweetUrl, folderIds);
+
+        if (response is null)
+        {
+            _errorMessage = "Failed to submit tweet. The URL may be invalid or the tweet was already archived.";
+            _submitState = SubmitState.Error;
+            return;
+        }
+
+        _submittedTweetId = response.TweetId;
+
+        _pollCts = new CancellationTokenSource();
+        var stageTask = AnimateStagesAsync(_pollCts.Token);
+        var pollTask = PollStatusAsync(response.TweetId, _pollCts.Token);
+
+        await Task.WhenAll(stageTask, pollTask);
+    }
+
+    private async Task AnimateStagesAsync(CancellationToken ct)
+    {
+        // Simulated stage timings — advance through steps on a timer.
+        // Each entry: (stepIndex to mark Done, next stepIndex to mark Active, delay before advancing)
+        (int doneIdx, int activeIdx, int delayMs)[] transitions =
+        {
+            (0, 1, 800),    // "Fetching tweet data" done → "Loading author profile" active
+            (1, 2, 1200),   // "Loading author profile" done → "Capturing screenshot" active
+        };
+
+        foreach (var (doneIdx, activeIdx, delayMs) in transitions)
+        {
+            try
+            {
+                await Task.Delay(delayMs, ct);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+
+            if (_submitState != SubmitState.Processing)
+            {
+                return;
+            }
+
+            _steps[doneIdx] = _steps[doneIdx] with { State = StepState.Done };
+            _steps[activeIdx] = _steps[activeIdx] with { State = StepState.Active };
+            await InvokeAsync(StateHasChanged);
+        }
+
+        // Animate the screenshot progress bar from 0→~85% over ~4s
+        var targetPercent = 85;
+        var durationMs = 4000;
+        var intervalMs = 80;
+        var totalTicks = durationMs / intervalMs;
+
+        for (var tick = 1; tick <= totalTicks; tick++)
+        {
+            try
+            {
+                await Task.Delay(intervalMs, ct);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+
+            if (_submitState != SubmitState.Processing)
+            {
+                return;
+            }
+
+            // Ease-out curve: fast start, slows down near target
+            var t = (double)tick / totalTicks;
+            _progressPercent = (int)(targetPercent * (1 - Math.Pow(1 - t, 3)));
+            await InvokeAsync(StateHasChanged);
+        }
+
+        // Hold at ~85% — polling will resolve the final state
+        while (!ct.IsCancellationRequested && _submitState == SubmitState.Processing)
+        {
+            try
+            {
+                await Task.Delay(500, ct);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+        }
+    }
+
+    private async Task PollStatusAsync(Guid tweetId, CancellationToken ct)
+    {
+        const int maxAttempts = 30;
+        const int pollIntervalMs = 2000;
+
+        for (var attempt = 0; attempt < maxAttempts; attempt++)
+        {
+            try
+            {
+                await Task.Delay(pollIntervalMs, ct);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+
+            var status = await Api.GetTweetStatusAsync(tweetId);
+            if (status is null)
+            {
+                continue;
+            }
+
+            if (string.Equals(status.FetchStatus, "Ok", StringComparison.OrdinalIgnoreCase))
+            {
+                FinishAllSteps();
+                _submitState = SubmitState.Success;
+                CancelPolling();
+                await InvokeAsync(StateHasChanged);
+                return;
+            }
+
+            if (string.Equals(status.FetchStatus, "NotFound", StringComparison.OrdinalIgnoreCase))
+            {
+                _errorMessage = "Scrape failed: Tweet not found (may be deleted or private)";
+                _submitState = SubmitState.Error;
+                CancelPolling();
+                await InvokeAsync(StateHasChanged);
+                return;
+            }
+
+            if (string.Equals(status.FetchStatus, "Private", StringComparison.OrdinalIgnoreCase))
+            {
+                _errorMessage = "Scrape failed: Tweet is from a private account";
+                _submitState = SubmitState.Error;
+                CancelPolling();
+                await InvokeAsync(StateHasChanged);
+                return;
+            }
+
+            if (string.Equals(status.FetchStatus, "ScrapeFailed", StringComparison.OrdinalIgnoreCase))
+            {
+                _errorMessage = "Scrape failed: Could not retrieve tweet content";
+                _submitState = SubmitState.Error;
+                CancelPolling();
+                await InvokeAsync(StateHasChanged);
+                return;
+            }
+        }
+
+        // Timed out after maxAttempts
+        _errorMessage = "Archiving is taking longer than expected. Check back later.";
+        _submitState = SubmitState.Error;
+        CancelPolling();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void FinishAllSteps()
+    {
+        for (var i = 0; i < _steps.Count; i++)
+        {
+            _steps[i] = _steps[i] with { State = StepState.Done };
+        }
+
+        _progressPercent = 100;
+    }
+
+    private void CancelPolling()
+    {
+        _pollCts?.Cancel();
+        _pollCts?.Dispose();
+        _pollCts = null;
+    }
+
+    private void ResetForm()
+    {
+        CancelPolling();
+        _tweetUrl = "";
+        _folderSearch = "";
+        _selectedFolders.Clear();
+        _submitState = SubmitState.Form;
+        _submittedTweetId = null;
+        _steps = BuildInitialSteps();
+        _progressPercent = 0;
+    }
+
+    private static List<ProcessStep> BuildInitialSteps() =>
+    [
+        new("Fetching tweet data", StepState.Active, false),
+        new("Loading author profile", StepState.Pending, false),
+        new("Capturing screenshot", StepState.Pending, true),
+        new("Downloading media", StepState.Pending, false),
+    ];
+
+    private record ProcessStep(string Label, StepState State, bool ShowCapture);
+
+    private enum StepState { Pending, Active, Done }
+
+    private enum SubmitState
+    {
+        Form,
+        Processing,
+        Success,
+        Error,
+    }
+}

@@ -1,0 +1,34 @@
+<div class="tweet-folders" @onclick:stopPropagation>
+    <i class="bi bi-folder tweet-folders-icon"></i>
+    @foreach (var folder in Folders)
+    {
+        <a href="/browse/@folder.Id" class="tweet-folder-chip">
+            @folder.Name
+            @if (CanEdit)
+            {
+                <button class="tweet-folder-remove" type="button" @onclick="() => RemoveFolder(folder.Id)" @onclick:stopPropagation>
+                    &times;
+                </button>
+            }
+        </a>
+    }
+    @if (CanEdit)
+    {
+        <button class="tweet-folder-add" type="button">
+            <i class="bi bi-plus"></i> Folder
+        </button>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public IReadOnlyList<FolderChipViewModel> Folders { get; set; } = [];
+
+    [Parameter]
+    public bool CanEdit { get; set; }
+
+    private void RemoveFolder(Guid folderId)
+    {
+        // Will be implemented when folder management is added
+    }
+}

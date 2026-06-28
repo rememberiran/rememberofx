@@ -1,0 +1,69 @@
+.vote-button-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    flex-shrink: 0;
+}
+
+.vote-btn {
+    width: 46px;
+    height: 38px;
+    border-radius: 8px;
+    border: 1px solid var(--mox-border-card);
+    background: var(--mox-surface);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.vote-btn i {
+    color: var(--mox-muted-light);
+    font-size: 16px;
+    transition: color 0.15s;
+}
+
+.vote-btn:hover {
+    border-color: var(--mox-accent);
+    background: var(--mox-danger-bg);
+}
+
+.vote-btn:hover i {
+    color: var(--mox-accent);
+}
+
+.vote-btn.voted {
+    background: var(--mox-accent);
+    border-color: var(--mox-accent);
+}
+
+.vote-btn.voted i {
+    color: #fff;
+}
+
+.vote-count {
+    font-weight: 800;
+    font-size: 21px;
+    color: var(--mox-ink);
+    line-height: 1.2;
+}
+
+.vote-count.voted {
+    color: var(--mox-accent);
+    animation: votepop 0.3s ease;
+}
+
+.vote-label {
+    font-size: 11px;
+    color: var(--mox-muted-light);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+@keyframes votepop {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.2); }
+    100% { transform: scale(1); }
+}

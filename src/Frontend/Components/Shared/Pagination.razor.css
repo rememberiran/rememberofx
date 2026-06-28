@@ -1,0 +1,38 @@
+.pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    padding: 24px 0;
+}
+
+.pagination-btn {
+    background: var(--mox-surface);
+    border: 1px solid var(--mox-border-card);
+    border-radius: var(--mox-radius-input);
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--mox-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: border-color 0.15s, color 0.15s;
+}
+
+.pagination-btn:hover:not(:disabled) {
+    border-color: var(--mox-accent);
+    color: var(--mox-accent);
+}
+
+.pagination-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.pagination-info {
+    font-size: 13px;
+    color: var(--mox-muted);
+    font-weight: 500;
+}

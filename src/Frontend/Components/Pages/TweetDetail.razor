@@ -1,0 +1,186 @@
+@page "/t/{TweetId:guid}"
+@rendermode InteractiveServer
+
+<PageTitle>Tweet</PageTitle>
+
+@if (_loading)
+{
+    <div class="mox-container-narrow" style="padding-top: 32px;">
+        <LoadingSkeleton Count="3" />
+    </div>
+}
+else if (_model is not null)
+{
+    <div class="mox-container-narrow" style="padding-top: 32px; padding-bottom: 64px;">
+        <Breadcrumbs Items="@_model.Breadcrumb.ToList()" />
+
+        <div class="tweet-detail-card">
+            <!-- Author -->
+            <div class="author-section">
+                <div class="author-avatar">
+                    @GetInitial(_model.Tweet.Author)
+                </div>
+                <div class="author-info">
+                    <span class="author-username">@@@_model.Tweet.Author</span>
+                    @if (!string.IsNullOrEmpty(_model.Tweet.AuthorDisplayName))
+                    {
+                        <span class="author-displayname">@_model.Tweet.AuthorDisplayName</span>
+                    }
+                </div>
+                @if (_model.AuthorProfile is not null)
+                {
+                    <a href="/u/@_model.AuthorProfile.XUserId" class="author-profile-link">
+                        View profile <i class="bi bi-arrow-right"></i>
+                    </a>
+                }
+            </div>
+
+            <!-- Tweet text -->
+            <blockquote class="tweet-blockquote">
+                @_model.Tweet.Text
+            </blockquote>
+
+            <!-- Screenshot -->
+            @if (!string.IsNullOrEmpty(_model.Tweet.ScreenshotUrl))
+            {
+                <div class="screenshot-placeholder">
+                    <span>Tweet Screenshot</span>
+                </div>
+            }
+
+            <!-- Media -->
+            @if (_model.Tweet.Media.Count > 0)
+            {
+                <div class="media-gallery">
+                    @foreach (var media in _model.Tweet.Media)
+                    {
+                        <div class="media-placeholder">
+                            <i class="bi bi-image" style="font-size: 24px; color: var(--mox-muted-light);"></i>
+                            <span style="font-size: 12px; color: var(--mox-muted-light);">@media.Type</span>
+                        </div>
+                    }
+                </div>
+            }
+
+            <!-- Metadata -->
+            <div class="metadata-row">
+                <span class="metadata-item">
+                    <i class="bi bi-calendar3"></i> @_model.Tweet.Date
+                </span>
+                @if (!_model.Tweet.IsDeleted)
+                {
+                    <span class="mox-chip" style="background: var(--mox-success-bg); color: var(--mox-success-text); border: 1px solid var(--mox-success-border);">
+                        Archived copy
+                    </span>
+                }
+                else
+                {
+                    <span class="mox-chip" style="background: var(--mox-danger-bg); color: var(--mox-danger-text); border: 1px solid var(--mox-danger-border);">
+                        Original deleted
+                    </span>
+                }
+                @if (!string.IsNullOrEmpty(_model.Tweet.TweetUrl))
+                {
+                    <a href="@_model.Tweet.TweetUrl" target="_blank" rel="noopener" class="mox-text-accent" style="font-size: 13px; text-decoration: none;">
+                        View original on X <i class="bi bi-box-arrow-up-right"></i>
+                    </a>
+                }
+            </div>
+
+            <!-- Tags -->
+            @if (_model.Tweet.Tags.Count > 0)
+            {
+                <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px;">
+                    @foreach (var tag in _model.Tweet.Tags)
+                    {
+                        <TagChip Tag="@tag" />
+                    }
+                </div>
+            }
+
+            <!-- Capture info -->
+            @if (_model.Capture is not null)
+            {
+                <div class="capture-card">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <div class="capture-avatar">
+                            @GetInitial(_model.Capture.CapturedBy)
+                        </div>
+                        <div>
+                            <div style="font-weight: 600; font-size: 14px; color: var(--mox-ink);">
+                                Captured by @@@_model.Capture.CapturedBy
+                            </div>
+                            <div style="font-size: 13px; color: var(--mox-muted);">
+                                Archived @_model.Capture.CapturedAt
+                            </div>
+                        </div>
+                        <span class="mox-chip" style="margin-left: auto;">Contributor</span>
+                    </div>
+                </div>
+            }
+
+            <!-- Vote section -->
+            <div class="vote-section">
+                <button class="vote-circle @(_voted ? "voted" : "")" @onclick="HandleVote">
+                    <i class="bi bi-arrow-up"></i>
+                </button>
+                <span class="vote-count">@_voteCount</span>
+                <span style="font-size: 14px; color: var(--mox-muted);">
+                    @(_voted ? "You voted!" : "Vote for this tweet")
+                </span>
+            </div>
+
+            <!-- Folders -->
+            @if (_model.Tweet.Folders.Count > 0)
+            {
+                <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--mox-border-inner);">
+                    <span style="font-size: 13px; font-weight: 600; color: var(--mox-muted); display: block; margin-bottom: 8px;">
+                        In folders
+                    </span>
+                    <TweetFolders Folders="@_model.Tweet.Folders" CanEdit="false" />
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private TweetDetailPageModel? _model;
+    private bool _loading = true;
+    private bool _voted;
+    private int _voteCount;
+
+    [Parameter]
+    public Guid TweetId { get; set; }
+
+    [Inject]
+    private TweetDetailOrchestrator Orchestrator { get; set; } = default!;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        _model = await Orchestrator.GetAsync(TweetId);
+        if (_model is not null)
+        {
+            _voteCount = _model.Tweet.VoteCount;
+        }
+
+        _loading = false;
+    }
+
+    private async Task HandleVote()
+    {
+        if (!_voted)
+        {
+            _voted = true;
+            _voteCount++;
+        }
+
+        await Task.CompletedTask;
+    }
+
+    private static string GetInitial(string name)
+    {
+        return string.IsNullOrEmpty(name) ? "?" : name[..1].ToUpperInvariant();
+    }
+}

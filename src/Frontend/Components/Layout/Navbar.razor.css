@@ -1,0 +1,117 @@
+.navbar {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: var(--mox-ink);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+    height: var(--mox-navbar-height);
+}
+
+.navbar-inner {
+    max-width: var(--mox-max-width);
+    margin: 0 auto;
+    padding: 0 24px;
+    display: flex;
+    align-items: center;
+    gap: 30px;
+    height: 100%;
+}
+
+.navbar-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    flex-shrink: 0;
+}
+
+.navbar-logo {
+    width: 30px;
+    height: 30px;
+    border-radius: 7px;
+    background: var(--mox-accent);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mox-font-sans);
+    font-weight: 800;
+    font-size: 15px;
+}
+
+.navbar-title {
+    font-family: var(--mox-font-serif);
+    font-size: 17px;
+    font-weight: 700;
+    color: #fff;
+}
+
+.navbar-links {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    flex: 1;
+}
+
+.navbar-link {
+    color: rgba(255, 255, 255, 0.72);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    height: var(--mox-navbar-height);
+    display: flex;
+    align-items: center;
+    border-bottom: 2px solid transparent;
+    transition: color 0.15s, border-color 0.15s;
+}
+
+.navbar-link:hover {
+    color: #fff;
+}
+
+.navbar-link.active {
+    color: #fff;
+    border-bottom-color: var(--mox-accent);
+}
+
+.navbar-auth {
+    flex-shrink: 0;
+}
+
+.navbar-signin {
+    background: #fdfbf7;
+    color: var(--mox-ink);
+    border: none;
+    border-radius: var(--mox-radius-chip);
+    padding: 8px 15px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: background 0.15s;
+}
+
+.navbar-signin:hover {
+    background: #f0ece3;
+}
+
+@media (max-width: 760px) {
+    ::deep .nav-submit {
+        display: none;
+    }
+
+    .navbar-links {
+        gap: 14px;
+    }
+
+    .navbar-link {
+        font-size: 13px;
+    }
+
+    .navbar-inner {
+        padding: 0 14px;
+        gap: 16px;
+    }
+}

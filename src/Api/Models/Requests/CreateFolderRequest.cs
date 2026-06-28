@@ -11,5 +11,8 @@ public class CreateFolderRequest
     [MaxLength(1000)]
     public string? Description { get; set; }
 
+    [MaxLength(50)]
+    public string? Icon { get; set; }
+
     public Guid? ParentFolderId { get; set; }
 }

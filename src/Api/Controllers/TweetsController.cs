@@ -2,6 +2,7 @@ using Api.Extensions;
 using Api.Mappers;
 using Api.Models.Requests;
 using Api.Models.Responses;
+using Application;
 using Application.Interfaces;
 using Application.Models;
 using Domain.Enums;
@@ -15,15 +16,21 @@ public class TweetsController : ControllerBase
 {
     private readonly ITweetSubmissionService _submissionService;
     private readonly ITweetQueryService _queryService;
+    private readonly IVoteService _voteService;
+    private readonly IAsyncContext<IdentityContext> _identityContext;
     private readonly TweetDtoMapper _tweetDtoMapper;
 
     public TweetsController(
         ITweetSubmissionService submissionService,
         ITweetQueryService queryService,
+        IVoteService voteService,
+        IAsyncContext<IdentityContext> identityContext,
         TweetDtoMapper tweetDtoMapper)
     {
         _submissionService = submissionService;
         _queryService = queryService;
+        _voteService = voteService;
+        _identityContext = identityContext;
         _tweetDtoMapper = tweetDtoMapper;
     }
 
@@ -87,7 +94,19 @@ public class TweetsController : ControllerBase
             return result.ToActionResult();
         }
 
-        var dto = _tweetDtoMapper.ToDto(result.Value!);
+        var tweet = result.Value!;
+        var userId = _identityContext.Value?.InternalUserId;
+        HashSet<Guid>? votedIds = null;
+        if (userId.HasValue)
+        {
+            var votedResult = await _voteService.GetVotedTweetIdsAsync(userId.Value, new[] { tweet.Tweet.Id }, ct);
+            if (votedResult.IsSuccess)
+            {
+                votedIds = votedResult.Value;
+            }
+        }
+
+        var dto = _tweetDtoMapper.ToDto(tweet, votedIds);
         return Ok(dto);
     }
 }

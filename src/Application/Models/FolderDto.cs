@@ -4,6 +4,7 @@ public record FolderDto(
     Guid Id,
     string Name,
     string? Description,
+    string? Icon,
     Guid? ParentFolderId,
     int ChildCount,
     DateTime CreatedAt,
@@ -15,7 +16,9 @@ public record FolderSummaryDto(
     Guid Id,
     string Name,
     string? Description,
-    int ChildCount);
+    string? Icon,
+    int ChildCount,
+    int TweetCount);
 
 public record FolderBreadcrumbDto(
     Guid Id,

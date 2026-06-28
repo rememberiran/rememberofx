@@ -2,4 +2,4 @@ using Domain.Entities;
 
 namespace Application.Models;
 
-public record FolderSummary(Folder Folder, int ActiveChildCount);
+public record FolderSummary(Folder Folder, int ActiveChildCount, int TweetCount);

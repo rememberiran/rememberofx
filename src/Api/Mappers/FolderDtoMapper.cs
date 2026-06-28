@@ -15,6 +15,7 @@ public static class FolderDtoMapper
             folder.Id,
             folder.Name,
             folder.Description,
+            folder.Icon,
             folder.ParentFolderId,
             childCount,
             folder.CreatedAt,
@@ -29,16 +30,20 @@ public static class FolderDtoMapper
             summary.Folder.Id,
             summary.Folder.Name,
             summary.Folder.Description,
-            summary.ActiveChildCount);
+            summary.Folder.Icon,
+            summary.ActiveChildCount,
+            summary.TweetCount);
     }
 
-    public static FolderSummaryDto ToSummaryDto(Folder folder, int activeChildCount)
+    public static FolderSummaryDto ToSummaryDto(Folder folder, int activeChildCount, int tweetCount)
     {
         return new FolderSummaryDto(
             folder.Id,
             folder.Name,
             folder.Description,
-            activeChildCount);
+            folder.Icon,
+            activeChildCount,
+            tweetCount);
     }
 
     public static FolderBreadcrumbDto ToBreadcrumbDto(Folder folder)

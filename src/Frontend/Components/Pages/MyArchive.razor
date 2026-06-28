@@ -1,0 +1,212 @@
+@page "/me"
+@rendermode InteractiveServer
+
+<PageTitle>My Archive</PageTitle>
+
+<div class="mox-container-narrow" style="padding-top: 32px; padding-bottom: 64px;">
+    <Breadcrumbs Items="@_breadcrumb" />
+
+    @if (_loading)
+    {
+        <LoadingSkeleton Count="4" />
+    }
+    else if (_model is not null)
+    {
+        <!-- Header card -->
+        <div class="archive-header-card">
+            <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 20px;">
+                <div class="archive-avatar">
+                    <i class="bi bi-person-fill" style="font-size: 28px;"></i>
+                </div>
+                <div style="flex: 1;">
+                    <h1 style="font-family: var(--mox-font-serif); font-size: 24px; font-weight: 800; color: var(--mox-ink); margin: 0 0 4px;">
+                        My Archive
+                    </h1>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span class="mox-chip" style="font-size: 11px;">Contributor</span>
+                    </div>
+                </div>
+                <a href="/submit" class="mox-btn-primary" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none;">
+                    <i class="bi bi-plus-lg"></i> Submit a Tweet
+                </a>
+            </div>
+
+            <div class="archive-stats">
+                <div class="archive-stat">
+                    <span class="archive-stat-value">@_model.SubmittedTweets.Count</span>
+                    <span class="archive-stat-label">Tweets submitted</span>
+                </div>
+                <div class="archive-stat">
+                    <span class="archive-stat-value">@_model.CreatedFolders.Count</span>
+                    <span class="archive-stat-label">Folders created</span>
+                </div>
+                <div class="archive-stat">
+                    <span class="archive-stat-value mox-text-accent">@_model.TotalVotesEarned</span>
+                    <span class="archive-stat-label">Votes earned</span>
+                </div>
+                <div class="archive-stat">
+                    <span class="archive-stat-value" style="color: var(--mox-danger-text);">@_model.DeletedTweetsPreserved</span>
+                    <span class="archive-stat-label">Deleted tweets preserved</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab toggle -->
+        <div class="tab-toggle">
+            <button class="tab-btn @(_activeTab == Tab.Tweets ? "active" : "")" @onclick="@(() => _activeTab = Tab.Tweets)">
+                <i class="bi bi-chat-square-text"></i> Tweets
+            </button>
+            <button class="tab-btn @(_activeTab == Tab.Folders ? "active" : "")" @onclick="@(() => _activeTab = Tab.Folders)">
+                <i class="bi bi-folder"></i> Folders
+            </button>
+        </div>
+
+        @if (_activeTab == Tab.Tweets)
+        {
+            @if (_model.SubmittedTweets.Count > 0)
+            {
+                @foreach (var tweet in _model.SubmittedTweets)
+                {
+                    <div style="margin-bottom: 16px;">
+                        @if (!string.IsNullOrEmpty(tweet.SubmittedDate))
+                        {
+                            <p style="font-size: 12px; color: var(--mox-muted); margin: 0 0 6px;">
+                                <i class="bi bi-person-check"></i> Submitted by you · @tweet.SubmittedDate
+                            </p>
+                        }
+                        <TweetCard Tweet="@tweet"
+                                   ShowScreenshot="true"
+                                   ShowCapture="true"
+                                   ShowFolders="true"
+                                   ShowStatus="true"
+                                   OnVote="@(() => HandleVote(tweet.Id))" />
+                    </div>
+                }
+            }
+            else
+            {
+                <EmptyState Icon="bi-chat-square-text"
+                            Title="No tweets submitted yet"
+                            Description="Submit your first tweet to start building your archive.">
+                    <a href="/submit" class="mox-btn-primary" style="text-decoration: none;">Submit a Tweet</a>
+                </EmptyState>
+            }
+        }
+        else
+        {
+            <!-- Create folder row -->
+            <div class="create-folder-row">
+                <input type="text"
+                       class="mox-input"
+                       placeholder="New folder name..."
+                       style="flex: 1;"
+                       @bind="_newFolderName" />
+                <button class="mox-btn-secondary"
+                        disabled="@(string.IsNullOrWhiteSpace(_newFolderName))"
+                        @onclick="CreateFolder">
+                    Create folder
+                </button>
+            </div>
+
+            @if (_model.CreatedFolders.Count > 0)
+            {
+                <div class="mox-grid-3">
+                    @foreach (var folder in _model.CreatedFolders)
+                    {
+                        <div class="my-folder-card">
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+                                <a href="/browse/@folder.Id" style="text-decoration: none;">
+                                    <h3 style="font-family: var(--mox-font-serif); font-size: 16px; font-weight: 700; color: var(--mox-ink); margin: 0;">
+                                        @folder.Name
+                                    </h3>
+                                </a>
+                                <button class="action-btn">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                            </div>
+                            @if (!string.IsNullOrEmpty(folder.Description))
+                            {
+                                <p style="font-size: 13px; color: var(--mox-muted); margin: 0 0 12px; line-height: 1.4;">
+                                    @folder.Description
+                                </p>
+                            }
+                            <div style="display: flex; gap: 14px; font-size: 12px; color: var(--mox-muted-light);">
+                                <span><i class="bi bi-chat-square-text"></i> @folder.TweetCount tweets</span>
+                                <span><i class="bi bi-folder"></i> @folder.SubfolderCount subfolders</span>
+                            </div>
+                            <div style="font-size: 11px; color: var(--mox-muted-light); margin-top: 8px;">
+                                Created @folder.Created
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <EmptyState Icon="bi-folder2-open"
+                            Title="No folders created yet"
+                            Description="Create a folder to organize archived tweets." />
+            }
+        }
+    }
+    else
+    {
+        <!-- Not signed in state -->
+        <div class="gate-card">
+            <i class="bi bi-person-lock" style="font-size: 48px; color: var(--mox-muted-light);"></i>
+            <h2 style="font-family: var(--mox-font-serif); font-size: 22px; font-weight: 700; color: var(--mox-ink); margin: 16px 0 8px;">
+                Sign in to see your archive
+            </h2>
+            <p style="font-size: 14px; color: var(--mox-muted); margin: 0 0 24px;">
+                Connect your X account to view your submissions and folders.
+            </p>
+            <button class="mox-btn-primary" style="display: inline-flex; align-items: center; gap: 8px; padding: 12px 28px;">
+                <i class="bi bi-twitter-x"></i> Sign in with X
+            </button>
+        </div>
+    }
+</div>
+
+@code {
+    private MyArchivePageModel? _model;
+    private bool _loading = true;
+    private Tab _activeTab = Tab.Tweets;
+    private string _newFolderName = "";
+
+    private readonly List<BreadcrumbItemViewModel> _breadcrumb = new()
+    {
+        new("Home", "/"),
+        new("My Archive", null),
+    };
+
+    [Inject]
+    private MyArchiveOrchestrator Orchestrator { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _model = await Orchestrator.GetAsync();
+        _loading = false;
+    }
+
+    private async Task HandleVote(Guid tweetId)
+    {
+        await Task.CompletedTask;
+    }
+
+    private async Task CreateFolder()
+    {
+        if (string.IsNullOrWhiteSpace(_newFolderName))
+        {
+            return;
+        }
+
+        _newFolderName = "";
+        await Task.CompletedTask;
+    }
+
+    private enum Tab
+    {
+        Tweets,
+        Folders,
+    }
+}

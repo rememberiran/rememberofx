@@ -24,9 +24,10 @@ public class SearchService : ISearchService
     public async Task<Result<TweetSearchResult>> SearchAsync(SearchTweetsQuery query, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(query.Q) && string.IsNullOrWhiteSpace(query.Tag) &&
-            string.IsNullOrWhiteSpace(query.Username) && string.IsNullOrWhiteSpace(query.UserId))
+            string.IsNullOrWhiteSpace(query.Username) && string.IsNullOrWhiteSpace(query.UserId) &&
+            !query.SubmittedByUserId.HasValue)
         {
-            return Result.Failure<TweetSearchResult>(DomainError.Validation($"At least one search parameter (q, tag, username, userId) is required"));
+            return Result.Failure<TweetSearchResult>(DomainError.Validation($"At least one search parameter (q, tag, username, userId, submittedByUserId) is required"));
         }
 
         IQueryable<TweetRecord> tweets;
@@ -39,11 +40,20 @@ public class SearchService : ISearchService
                 "LEFT JOIN XUserProfiles p ON t.AuthorXUserId = p.XUserId " +
                 "WHERE t.FetchStatus = 'Ok' AND (" +
                 "CONTAINS(t.TweetText, {0}) OR CONTAINS(p.CustomName, {0}) OR CONTAINS(p.Description, {0}))",
-                searchTerm).AsNoTracking();
+                searchTerm)
+                .Include(t => t.SubmittedByUser)
+                .Include(t => t.FolderTweets)
+                    .ThenInclude(ft => ft.Folder)
+                .AsNoTracking();
         }
         else
         {
-            tweets = _db.Tweets.AsNoTracking().Where(t => t.FetchStatus == "Ok");
+            tweets = _db.Tweets
+                .Include(t => t.SubmittedByUser)
+                .Include(t => t.FolderTweets)
+                    .ThenInclude(ft => ft.Folder)
+                .AsNoTracking()
+                .Where(t => t.FetchStatus == "Ok");
         }
 
         if (!string.IsNullOrWhiteSpace(query.Tag))
@@ -61,6 +71,11 @@ public class SearchService : ISearchService
         if (!string.IsNullOrWhiteSpace(query.UserId))
         {
             tweets = tweets.Where(t => t.AuthorXUserId == query.UserId);
+        }
+
+        if (query.SubmittedByUserId.HasValue)
+        {
+            tweets = tweets.Where(t => t.SubmittedByUserId == query.SubmittedByUserId);
         }
 
         var totalCount = await tweets.CountAsync(ct);

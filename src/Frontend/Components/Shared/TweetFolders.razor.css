@@ -1,0 +1,66 @@
+.tweet-folders {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 4px;
+}
+
+.tweet-folders-icon {
+    font-size: 13px;
+    color: var(--mox-muted-light);
+}
+
+.tweet-folder-chip {
+    background: var(--mox-chip-bg);
+    color: var(--mox-chip-text);
+    border-radius: var(--mox-radius-chip);
+    padding: 3px 10px;
+    font-size: 12px;
+    font-weight: 500;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: background 0.15s;
+}
+
+.tweet-folder-chip:hover {
+    background: var(--mox-border-inner);
+    color: var(--mox-chip-text);
+}
+
+.tweet-folder-remove {
+    background: none;
+    border: none;
+    color: var(--mox-muted-light);
+    cursor: pointer;
+    padding: 0;
+    font-size: 14px;
+    line-height: 1;
+    margin-left: 2px;
+}
+
+.tweet-folder-remove:hover {
+    color: var(--mox-danger-text);
+}
+
+.tweet-folder-add {
+    background: none;
+    border: 1px dashed var(--mox-border-input);
+    border-radius: var(--mox-radius-chip);
+    padding: 3px 10px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--mox-muted-light);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    transition: border-color 0.15s, color 0.15s;
+}
+
+.tweet-folder-add:hover {
+    border-color: var(--mox-accent);
+    color: var(--mox-accent);
+}

@@ -1,0 +1,24 @@
+<nav class="breadcrumbs">
+    @for (var i = 0; i < Items.Count; i++)
+    {
+        var item = Items[i];
+        if (i > 0)
+        {
+            <span class="breadcrumb-sep">/</span>
+        }
+
+        if (item.Href is not null)
+        {
+            <a href="@item.Href" class="breadcrumb-link">@item.Label</a>
+        }
+        else
+        {
+            <span class="breadcrumb-current">@item.Label</span>
+        }
+    }
+</nav>
+
+@code {
+    [Parameter]
+    public IReadOnlyList<BreadcrumbItemViewModel> Items { get; set; } = Array.Empty<BreadcrumbItemViewModel>();
+}

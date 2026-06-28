@@ -13,9 +13,9 @@ public static class FolderTweetMapper
             TweetId = record.TweetId,
             AddedByUserId = record.AddedByUserId,
             AddedAt = record.AddedAt,
-            Folder = FolderMapper.ToDomain(record.Folder),
-            Tweet = TweetMapper.ToDomain(record.Tweet),
-            AddedByUser = UserMapper.ToDomain(record.AddedByUser),
+            Folder = record.Folder is not null ? FolderMapper.ToDomain(record.Folder) : null!,
+            Tweet = record.Tweet is not null ? TweetMapper.ToDomain(record.Tweet) : null!,
+            AddedByUser = record.AddedByUser is not null ? UserMapper.ToDomain(record.AddedByUser) : null!,
         };
     }
 

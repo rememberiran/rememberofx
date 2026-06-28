@@ -1,0 +1,195 @@
+.submit-card {
+    background: var(--mox-surface);
+    border: 1px solid var(--mox-border-card);
+    border-radius: 12px;
+    padding: 28px;
+    margin-bottom: 30px;
+}
+
+.field-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--mox-ink);
+    margin-bottom: 8px;
+}
+
+.selected-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--mox-ink);
+    background: var(--mox-chip-bg);
+    border-radius: 7px;
+    padding: 5px 6px 5px 11px;
+}
+
+.folder-search-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--mox-chip-bg);
+    border: 1px solid var(--mox-border-input);
+    border-radius: var(--mox-radius-input);
+    padding: 0 11px;
+    margin-bottom: 8px;
+}
+
+.folder-search-bar input {
+    flex: 1;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-size: 14px;
+    padding: 11px 0;
+    color: var(--mox-ink);
+    font-family: inherit;
+}
+
+.folder-list {
+    border: 1px solid var(--mox-border-card);
+    border-radius: var(--mox-radius-input);
+    overflow: hidden;
+}
+
+.folder-list-label {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: var(--mox-muted-light);
+    text-transform: uppercase;
+    letter-spacing: .4px;
+    padding: 9px 14px 6px;
+}
+
+.folder-option {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 10px 14px;
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--mox-ink);
+    border-top: 1px solid var(--mox-border-inner);
+    transition: background 0.1s;
+}
+
+.folder-option:hover {
+    background: #f5efe3;
+}
+
+/* Processing steps */
+.process-step {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 0;
+    font-size: 14px;
+    color: var(--mox-ink);
+}
+
+.process-step.pending {
+    color: var(--mox-faint);
+}
+
+.process-step.active {
+    font-weight: 600;
+}
+
+.spinner {
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--mox-border-input);
+    border-top-color: var(--mox-accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    flex-shrink: 0;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Capture stage — the screenshot-specific progress card */
+.capture-stage {
+    background: #fdf6f1;
+    border: 1px solid var(--mox-danger-border);
+    border-radius: 9px;
+    padding: 13px 14px;
+    margin: 2px 0 12px;
+}
+
+.capture-preview {
+    position: relative;
+    width: 124px;
+    height: 78px;
+    flex-shrink: 0;
+    border-radius: 6px;
+    border: 1px solid var(--mox-danger-border);
+    overflow: hidden;
+    background: repeating-linear-gradient(
+        45deg,
+        var(--mox-chip-bg),
+        var(--mox-chip-bg) 8px,
+        #e3d9c8 8px,
+        #e3d9c8 16px
+    );
+}
+
+.capture-preview .scanline {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 18px;
+    background: linear-gradient(180deg, rgba(197, 83, 47, .42), rgba(197, 83, 47, 0));
+    animation: scanline 1.5s linear infinite;
+}
+
+@keyframes scanline {
+    0% { top: -16%; }
+    100% { top: 104%; }
+}
+
+.capture-preview-label {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 3px 7px;
+    background: rgba(43, 38, 34, .72);
+    color: #fff;
+    font-family: var(--mox-font-mono);
+    font-size: 9px;
+    letter-spacing: .3px;
+}
+
+.progress-bar-container {
+    height: 8px;
+    border-radius: 5px;
+    background: var(--mox-chip-bg);
+    overflow: hidden;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    background: var(--mox-accent);
+    border-radius: 5px;
+    transition: width 0.15s ease-out;
+}
+
+/* Result cards */
+.result-card {
+    padding: 20px;
+    border-radius: 12px;
+}
+
+.result-card.success {
+    background: var(--mox-success-bg);
+    border: 1px solid var(--mox-success-border);
+}
+
+.result-card.error {
+    background: var(--mox-danger-bg);
+    border: 1px solid var(--mox-danger-border);
+}

@@ -1,0 +1,35 @@
+<a href="/browse/@Folder.Id" class="folder-card">
+    <div class="folder-icon-tile">
+        <i class="bi @Folder.Icon"></i>
+    </div>
+    <div class="folder-info">
+        <h3 class="folder-name">@Folder.Name</h3>
+        @if (!string.IsNullOrEmpty(Folder.Description))
+        {
+            <p class="folder-desc">@Folder.Description</p>
+        }
+        <div class="folder-footer">
+            @if (Folder.SubfolderCount > 0)
+            {
+                <span class="folder-badge">
+                    <i class="bi bi-folder"></i> @Folder.SubfolderCount
+                </span>
+            }
+            @if (ShowTweetCount)
+            {
+                <span class="folder-badge">
+                    <i class="bi bi-chat-square-text"></i> @Folder.TweetCount
+                </span>
+            }
+            <i class="bi bi-chevron-right folder-chevron"></i>
+        </div>
+    </div>
+</a>
+
+@code {
+    [Parameter]
+    public FolderViewModel Folder { get; set; } = default!;
+
+    [Parameter]
+    public bool ShowTweetCount { get; set; } = true;
+}

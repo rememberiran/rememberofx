@@ -1,0 +1,13 @@
+.mox-footer {
+    border-top: 1px solid var(--mox-border-card);
+    background: var(--mox-surface);
+    padding: 28px 24px;
+    text-align: center;
+    color: var(--mox-muted-light);
+    font-size: 13px;
+}
+
+.mox-footer-inner strong {
+    color: var(--mox-muted);
+    font-weight: 600;
+}

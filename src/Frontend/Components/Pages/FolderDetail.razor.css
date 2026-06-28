@@ -1,0 +1,55 @@
+.folder-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 24px;
+}
+
+.subfolders-row {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    padding: 16px 20px;
+    margin: 0 -24px 24px;
+    background: #f0eadd;
+    border-radius: var(--mox-radius-card);
+}
+
+.subfolder-card {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: var(--mox-surface);
+    border: 1px solid var(--mox-border-card);
+    border-radius: var(--mox-radius-card);
+    text-decoration: none;
+    white-space: nowrap;
+    transition: border-color 0.15s;
+    flex-shrink: 0;
+}
+
+.subfolder-card:hover {
+    border-color: var(--mox-accent);
+}
+
+.subfolder-name {
+    font-family: var(--mox-font-sans);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--mox-ink);
+}
+
+.subfolder-count {
+    font-size: 12px;
+    color: var(--mox-muted-light);
+}
+
+.tweet-list-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--mox-border-inner);
+}

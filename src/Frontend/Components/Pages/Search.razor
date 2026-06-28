@@ -1,0 +1,201 @@
+@page "/search"
+@rendermode InteractiveServer
+
+<PageTitle>Search</PageTitle>
+
+<div class="mox-container-narrow" style="padding-top: 32px; padding-bottom: 64px;">
+    <!-- Search bar -->
+    <div class="search-bar">
+        <i class="bi bi-search" style="color: var(--mox-muted-light); font-size: 16px; flex-shrink: 0;"></i>
+        <input type="text"
+               class="search-input"
+               placeholder="Search archived tweets..."
+               @bind="_query"
+               @onkeydown="HandleSearchKeyDown" />
+        <button class="mox-btn-primary" style="flex-shrink: 0; padding: 8px 20px; font-size: 14px;" @onclick="ExecuteSearch">
+            Search
+        </button>
+    </div>
+
+    <!-- Filters -->
+    <div class="filter-row">
+        <input type="text"
+               class="mox-input"
+               placeholder="Filter by tag..."
+               style="width: 160px; padding: 6px 12px; font-size: 13px;"
+               @bind="_tag" />
+        <input type="text"
+               class="mox-input"
+               placeholder="Filter by username..."
+               style="width: 180px; padding: 6px 12px; font-size: 13px;"
+               @bind="_username" />
+        <select class="mox-input" style="width: auto; padding: 6px 12px; font-size: 13px;" @bind="_sort">
+            <option value="relevance">Most Relevant</option>
+            <option value="votes">Most Voted</option>
+            <option value="newest">Newest</option>
+            <option value="oldest">Oldest</option>
+        </select>
+        <div class="view-toggle">
+            <button class="toggle-btn @(_compactMode ? "" : "active")" @onclick="@(() => _compactMode = false)">
+                <i class="bi bi-list-ul"></i>
+            </button>
+            <button class="toggle-btn @(_compactMode ? "active" : "")" @onclick="@(() => _compactMode = true)">
+                <i class="bi bi-grid-3x3-gap"></i>
+            </button>
+        </div>
+    </div>
+
+    @if (_loading)
+    {
+        <LoadingSkeleton Count="4" />
+    }
+    else if (_model is not null)
+    {
+        @if (!string.IsNullOrEmpty(_model.Query))
+        {
+            <p style="font-size: 14px; color: var(--mox-muted); margin-bottom: 20px;">
+                <strong style="color: var(--mox-ink);">@_model.TotalCount</strong> results for
+                <strong>'@_model.Query'</strong>
+            </p>
+        }
+
+        @if (_model.SubjectProfile is not null)
+        {
+            <div class="subject-profile-card">
+                <div class="subject-avatar">
+                    @GetInitial(_model.SubjectProfile.XUsername)
+                </div>
+                <div style="flex: 1;">
+                    <div style="font-weight: 700; font-size: 16px; color: var(--mox-ink);">
+                        @@@_model.SubjectProfile.XUsername
+                    </div>
+                    @if (!string.IsNullOrEmpty(_model.SubjectProfile.DisplayName))
+                    {
+                        <div style="font-size: 13px; color: var(--mox-muted);">
+                            @_model.SubjectProfile.DisplayName
+                        </div>
+                    }
+                    @if (!string.IsNullOrEmpty(_model.SubjectProfile.Description))
+                    {
+                        <p style="font-size: 14px; color: var(--mox-ink); margin: 6px 0 0;">
+                            @_model.SubjectProfile.Description
+                        </p>
+                    }
+                </div>
+                <a href="/u/@_model.SubjectProfile.XUserId" style="font-size: 13px; color: var(--mox-accent); text-decoration: none; align-self: flex-start;">
+                    View profile <i class="bi bi-arrow-right"></i>
+                </a>
+            </div>
+        }
+
+        @if (_model.Results.Count > 0)
+        {
+            @foreach (var tweet in _model.Results)
+            {
+                <div style="margin-bottom: 16px;">
+                    <TweetCard Tweet="@tweet"
+                               ShowScreenshot="true"
+                               ShowCapture="true"
+                               ShowFolders="true"
+                               CompactMode="@_compactMode"
+                               OnVote="@(() => HandleVote(tweet.Id))" />
+                </div>
+            }
+
+            <Pagination CurrentPage="@_model.CurrentPage"
+                        TotalPages="@_model.TotalPages"
+                        OnPageChange="@HandlePageChange" />
+        }
+        else if (!string.IsNullOrEmpty(_model.Query) || !string.IsNullOrEmpty(_model.Tag) || !string.IsNullOrEmpty(_model.Username))
+        {
+            <EmptyState Icon="bi-search"
+                        Title="No results found"
+                        Description="Try adjusting your search terms or filters." />
+        }
+    }
+</div>
+
+@code {
+    private SearchPageModel? _model;
+    private bool _loading;
+    private string _query = "";
+    private string _tag = "";
+    private string _username = "";
+    private string _sort = "relevance";
+    private bool _compactMode;
+    private int _page = 1;
+    private const int PageSize = 20;
+
+    [Inject]
+    private SearchOrchestrator Orchestrator { get; set; } = default!;
+
+    [Inject]
+    private NavigationManager Navigation { get; set; } = default!;
+
+    [SupplyParameterFromQuery(Name = "q")]
+    public string? InitialQuery { get; set; }
+
+    [SupplyParameterFromQuery(Name = "tag")]
+    public string? InitialTag { get; set; }
+
+    [SupplyParameterFromQuery(Name = "username")]
+    public string? InitialUsername { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        _query = InitialQuery ?? "";
+        _tag = InitialTag ?? "";
+        _username = InitialUsername ?? "";
+
+        if (!string.IsNullOrEmpty(_query) || !string.IsNullOrEmpty(_tag) || !string.IsNullOrEmpty(_username))
+        {
+            await LoadData();
+        }
+    }
+
+    private async Task LoadData()
+    {
+        _loading = true;
+        StateHasChanged();
+
+        _model = await Orchestrator.GetAsync(
+            string.IsNullOrWhiteSpace(_query) ? null : _query,
+            string.IsNullOrWhiteSpace(_tag) ? null : _tag,
+            string.IsNullOrWhiteSpace(_username) ? null : _username,
+            _sort,
+            _page,
+            PageSize);
+
+        _loading = false;
+    }
+
+    private async Task ExecuteSearch()
+    {
+        _page = 1;
+        await LoadData();
+    }
+
+    private async Task HandleSearchKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await ExecuteSearch();
+        }
+    }
+
+    private async Task HandlePageChange(int page)
+    {
+        _page = page;
+        await LoadData();
+    }
+
+    private async Task HandleVote(Guid tweetId)
+    {
+        await Task.CompletedTask;
+    }
+
+    private static string GetInitial(string name)
+    {
+        return string.IsNullOrEmpty(name) ? "?" : name[..1].ToUpperInvariant();
+    }
+}

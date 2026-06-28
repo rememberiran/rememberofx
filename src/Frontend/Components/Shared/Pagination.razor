@@ -1,0 +1,36 @@
+<div class="pagination">
+    <button class="pagination-btn" type="button" disabled="@(CurrentPage <= 1)" @onclick="GoToPrevious">
+        <i class="bi bi-chevron-left"></i> Previous
+    </button>
+    <span class="pagination-info">Page @CurrentPage of @TotalPages</span>
+    <button class="pagination-btn" type="button" disabled="@(CurrentPage >= TotalPages)" @onclick="GoToNext">
+        Next <i class="bi bi-chevron-right"></i>
+    </button>
+</div>
+
+@code {
+    [Parameter]
+    public int CurrentPage { get; set; } = 1;
+
+    [Parameter]
+    public int TotalPages { get; set; } = 1;
+
+    [Parameter]
+    public EventCallback<int> OnPageChange { get; set; }
+
+    private async Task GoToPrevious()
+    {
+        if (CurrentPage > 1)
+        {
+            await OnPageChange.InvokeAsync(CurrentPage - 1);
+        }
+    }
+
+    private async Task GoToNext()
+    {
+        if (CurrentPage < TotalPages)
+        {
+            await OnPageChange.InvokeAsync(CurrentPage + 1);
+        }
+    }
+}

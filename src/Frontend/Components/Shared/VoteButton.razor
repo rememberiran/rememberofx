@@ -1,0 +1,23 @@
+<div class="vote-button-wrap" @onclick:stopPropagation>
+    <button class="vote-btn @(IsVoted ? "voted" : "")" type="button" @onclick="HandleVote">
+        <i class="bi bi-caret-up-fill"></i>
+    </button>
+    <span class="vote-count @(IsVoted ? "voted" : "")">@VoteCount</span>
+    <span class="vote-label">votes</span>
+</div>
+
+@code {
+    [Parameter]
+    public int VoteCount { get; set; }
+
+    [Parameter]
+    public bool IsVoted { get; set; }
+
+    [Parameter]
+    public EventCallback OnVote { get; set; }
+
+    private async Task HandleVote()
+    {
+        await OnVote.InvokeAsync();
+    }
+}

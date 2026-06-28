@@ -1,0 +1,28 @@
+.breadcrumbs {
+    font-size: 13px;
+    color: var(--mox-muted);
+    margin-bottom: 18px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.breadcrumb-sep {
+    color: var(--mox-faint);
+}
+
+.breadcrumb-link {
+    color: var(--mox-muted);
+    text-decoration: none;
+    transition: color 0.15s;
+}
+
+.breadcrumb-link:hover {
+    color: var(--mox-accent);
+}
+
+.breadcrumb-current {
+    color: var(--mox-ink);
+    font-weight: 700;
+}

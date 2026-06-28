@@ -14,7 +14,12 @@ public record TweetDto(
     string FetchStatus,
     DateTime CreatedAt,
     IReadOnlyList<TweetMediaDto> Media,
-    XUserProfileDto? AuthorProfile = null);
+    XUserProfileDto? AuthorProfile = null,
+    IReadOnlyList<TweetFolderDto>? Folders = null,
+    string? SubmittedByUsername = null,
+    bool IsVotedByMe = false);
+
+public record TweetFolderDto(Guid FolderId, string FolderName);
 
 public record TweetMediaDto(
     Guid Id,

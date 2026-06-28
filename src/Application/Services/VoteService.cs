@@ -10,6 +10,7 @@ public class VoteService : IVoteService
 {
     private readonly IAppDbContext _db;
     private static readonly EventId VoteCastEvent = new(1030, "VoteCast");
+    private static readonly EventId VotedTweetIdsQueriedEvent = new(1031, "VotedTweetIdsQueried");
 
     private readonly IAsyncContext<IdentityContext> _identityContext;
     private readonly ILogger<VoteService> _logger;
@@ -82,5 +83,17 @@ public class VoteService : IVoteService
 
         _logger.LogInformation(VoteCastEvent, "Vote cast for tweet {TweetId} by {VoterIdentity}", tweetId, voterUserId?.ToString() ?? voterIp);
         return Result.Success();
+    }
+
+    public async Task<Result<HashSet<Guid>>> GetVotedTweetIdsAsync(Guid userId, IReadOnlyList<Guid> tweetIds, CancellationToken ct)
+    {
+        var votedIds = await _db.Votes.AsNoTracking()
+            .Where(v => v.VoterUserId == userId && tweetIds.Contains(v.TweetId))
+            .Select(v => v.TweetId)
+            .ToListAsync(ct);
+
+        _logger.LogInformation(VotedTweetIdsQueriedEvent, "Queried {VotedCount} voted tweet IDs for user {UserId}", votedIds.Count, userId);
+
+        return Result.Success(votedIds.ToHashSet());
     }
 }

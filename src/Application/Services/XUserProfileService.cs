@@ -1,4 +1,5 @@
 ﻿using Application.Interfaces;
+using Application.Models;
 using Domain.Entities;
 using Domain.Mappers;
 using Microsoft.EntityFrameworkCore;
@@ -12,6 +13,7 @@ public class XUserProfileService : IXUserProfileService
     private readonly IAppDbContext _db;
     private static readonly EventId ProfileCreatedEvent = new(1060, "XUserProfileCreated");
     private static readonly EventId ProfileUpdatedEvent = new(1061, "XUserProfileUpdated");
+    private static readonly EventId AuthorStatsRetrievedEvent = new(1062, "AuthorStatsRetrieved");
 
     private readonly ILogger<XUserProfileService> _logger;
 
@@ -30,6 +32,22 @@ public class XUserProfileService : IXUserProfileService
         }
 
         return Result.Success(XUserProfileMapper.ToDomain(profile));
+    }
+
+    public async Task<Result<AuthorStats>> GetAuthorStatsAsync(string xUserId, CancellationToken ct)
+    {
+        var stats = await _db.Tweets.AsNoTracking()
+            .Where(t => t.AuthorXUserId == xUserId && t.FetchStatus == "Ok")
+            .GroupBy(_ => 1)
+            .Select(g => new AuthorStats(
+                g.Count(),
+                g.Sum(t => t.VoteCount),
+                g.Min(t => t.CreatedAt)))
+            .FirstOrDefaultAsync(ct);
+
+        _logger.LogInformation(AuthorStatsRetrievedEvent, "Author stats retrieved for {XUserId}", xUserId);
+
+        return Result.Success(stats ?? new AuthorStats(0, 0, null));
     }
 
     public async Task<Result<XUserProfile>> UpsertAsync(string xUserId, string? customName, string? description, Guid? updatedByUserId, CancellationToken ct)

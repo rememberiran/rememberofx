@@ -1,0 +1,39 @@
+:root {
+    /* Colors */
+    --mox-bg: #f4f0e8;
+    --mox-surface: #fdfbf7;
+    --mox-ink: #2b2622;
+    --mox-muted: #6e6458;
+    --mox-muted-light: #9a8f7e;
+    --mox-faint: #bdae97;
+    --mox-accent: #c5532f;
+    --mox-accent-hover: #a8451f;
+    --mox-chip-bg: #efe7d9;
+    --mox-chip-text: #6d5f43;
+    --mox-border-card: #e5dccd;
+    --mox-border-inner: #ece3d3;
+    --mox-border-input: #d6c9b4;
+    --mox-success-text: #356b63;
+    --mox-success-bg: #e3eeeb;
+    --mox-success-border: #c2dcd6;
+    --mox-danger-text: #8f322b;
+    --mox-danger-bg: #f4e3df;
+    --mox-danger-border: #e3c4bd;
+    --mox-selection: #f0d9cb;
+    --mox-focus-ring: #c5532f;
+
+    /* Typography */
+    --mox-font-serif: 'Spectral', Georgia, 'Times New Roman', serif;
+    --mox-font-sans: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --mox-font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', 'Courier New', monospace;
+
+    /* Sizing */
+    --mox-radius-card: 8px;
+    --mox-radius-input: 7px;
+    --mox-radius-chip: 999px;
+    --mox-radius-icon: 10px;
+    --mox-max-width: 1200px;
+    --mox-max-width-narrow: 1000px;
+    --mox-max-width-content: 820px;
+    --mox-navbar-height: 60px;
+}

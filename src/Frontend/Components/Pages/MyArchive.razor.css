@@ -1,0 +1,117 @@
+.archive-header-card {
+    background: var(--mox-surface);
+    border: 1px solid var(--mox-border-card);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 24px;
+}
+
+.archive-avatar {
+    width: 62px;
+    height: 62px;
+    border-radius: 50%;
+    background: var(--mox-ink);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.archive-stats {
+    display: flex;
+    gap: 32px;
+    padding-top: 16px;
+    border-top: 1px solid var(--mox-border-inner);
+    flex-wrap: wrap;
+}
+
+.archive-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.archive-stat-value {
+    font-weight: 700;
+    font-size: 18px;
+    color: var(--mox-ink);
+}
+
+.archive-stat-label {
+    font-size: 12px;
+    color: var(--mox-muted);
+}
+
+.tab-toggle {
+    display: flex;
+    background: var(--mox-chip-bg);
+    border-radius: var(--mox-radius-chip);
+    padding: 4px;
+    margin-bottom: 24px;
+    width: fit-content;
+}
+
+.tab-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 20px;
+    border: none;
+    background: transparent;
+    border-radius: var(--mox-radius-chip);
+    font-family: var(--mox-font-sans);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--mox-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.tab-btn.active {
+    background: var(--mox-surface);
+    color: var(--mox-ink);
+    font-weight: 600;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.create-folder-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.my-folder-card {
+    background: var(--mox-surface);
+    border: 1px solid var(--mox-border-card);
+    border-radius: var(--mox-radius-card);
+    padding: 18px;
+}
+
+.my-folder-card:hover {
+    border-color: var(--mox-faint);
+}
+
+.action-btn {
+    padding: 4px 8px;
+    background: none;
+    border: 1px solid var(--mox-border-input);
+    border-radius: var(--mox-radius-input);
+    color: var(--mox-muted);
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.15s;
+}
+
+.action-btn:hover {
+    background: var(--mox-chip-bg);
+    color: var(--mox-ink);
+}
+
+.gate-card {
+    text-align: center;
+    padding: 60px 28px;
+    background: var(--mox-surface);
+    border: 1px solid var(--mox-border-card);
+    border-radius: 12px;
+}

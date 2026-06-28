@@ -5,6 +5,7 @@ public record SearchTweetsQuery(
     string? Tag,
     string? Username,
     string? UserId,
+    Guid? SubmittedByUserId = null,
     string Sort = $"votes",
     int Page = 1,
     int PageSize = 20);

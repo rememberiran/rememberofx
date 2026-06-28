@@ -1,0 +1,117 @@
+.tweet-card {
+    display: flex;
+    gap: 18px;
+    background: var(--mox-surface);
+    border: 1px solid var(--mox-border-card);
+    border-radius: var(--mox-radius-card);
+    padding: 20px;
+    text-decoration: none;
+    color: var(--mox-ink);
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.tweet-card:hover {
+    border-color: var(--mox-faint);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.tweet-card.compact {
+    gap: 14px;
+    padding: 16px;
+}
+
+.tweet-vote {
+    flex-shrink: 0;
+}
+
+.tweet-body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.tweet-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    flex-wrap: wrap;
+}
+
+.tweet-author {
+    color: var(--mox-accent);
+    font-weight: 600;
+}
+
+.tweet-display-name {
+    color: var(--mox-muted);
+}
+
+.tweet-sep {
+    color: var(--mox-faint);
+}
+
+.tweet-date {
+    color: var(--mox-muted-light);
+}
+
+.tweet-capture {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    color: var(--mox-muted-light);
+}
+
+.tweet-capture i {
+    color: var(--mox-success-text);
+    font-size: 11px;
+}
+
+.tweet-deleted-badge {
+    font-size: 12px;
+    color: var(--mox-danger-text);
+    background: var(--mox-danger-bg);
+    border: 1px solid var(--mox-danger-border);
+    border-radius: var(--mox-radius-input);
+    padding: 6px 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    align-self: flex-start;
+}
+
+.tweet-text {
+    font-family: var(--mox-font-serif);
+    font-size: 16px;
+    line-height: 1.55;
+    color: var(--mox-ink);
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.tweet-card.compact .tweet-text {
+    -webkit-line-clamp: 2;
+    font-size: 15px;
+}
+
+.tweet-screenshot {
+    margin-top: 4px;
+}
+
+.tweet-screenshot img {
+    max-width: 200px;
+    border-radius: var(--mox-radius-input);
+    border: 1px solid var(--mox-border-inner);
+}
+
+.tweet-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 4px;
+}

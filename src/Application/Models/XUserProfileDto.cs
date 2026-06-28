@@ -5,4 +5,7 @@ public record XUserProfileDto(
     string XUserId,
     string? ScrapedUsername,
     string? CustomName,
-    string? Description);
+    string? Description,
+    int ArchivedTweetCount = 0,
+    int TotalVotesReceived = 0,
+    DateTime? FirstArchivedAt = null);

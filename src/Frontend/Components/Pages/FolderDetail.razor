@@ -1,0 +1,146 @@
+@page "/browse/{FolderId:guid}"
+@rendermode InteractiveServer
+
+@if (_model is not null)
+{
+    <PageTitle>@_model.Folder.Name</PageTitle>
+}
+else
+{
+    <PageTitle>Folder</PageTitle>
+}
+
+@if (_loading)
+{
+    <div class="mox-container" style="padding-top: 32px;">
+        <LoadingSkeleton Count="6" />
+    </div>
+}
+else if (_model is not null)
+{
+    <div class="mox-container" style="padding-top: 32px;">
+        <Breadcrumbs Items="@_model.Breadcrumb.ToList()" />
+
+        <div class="folder-header">
+            <div>
+                <h1 style="font-family: var(--mox-font-serif); font-size: 30px; font-weight: 800; color: var(--mox-ink); margin: 0 0 8px;">
+                    @_model.Folder.Name
+                </h1>
+                @if (!string.IsNullOrEmpty(_model.Folder.Description))
+                {
+                    <p style="color: var(--mox-muted); font-size: 15px; margin: 0;">
+                        @_model.Folder.Description
+                    </p>
+                }
+            </div>
+            <button class="mox-btn-secondary" style="display: inline-flex; align-items: center; gap: 6px;">
+                <i class="bi bi-pencil"></i> Edit
+            </button>
+        </div>
+
+        @if (_model.Subfolders.Count > 0)
+        {
+            <div class="subfolders-row">
+                @foreach (var sub in _model.Subfolders)
+                {
+                    <a href="/browse/@sub.Id" class="subfolder-card">
+                        <i class="bi bi-folder" style="color: var(--mox-accent); font-size: 16px;"></i>
+                        <span class="subfolder-name">@sub.Name</span>
+                        <span class="subfolder-count">@sub.TweetCount tweets</span>
+                    </a>
+                }
+            </div>
+        }
+
+        <div class="tweet-list-header">
+            <span style="font-weight: 600; color: var(--mox-ink);">
+                @_model.TotalTweetCount Tweets
+            </span>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <select class="mox-input" style="width: auto; padding: 6px 12px; font-size: 13px;" @bind="_sort" @bind:after="ReloadData">
+                    <option value="votes">Most Voted</option>
+                    <option value="newest">Newest</option>
+                    <option value="oldest">Oldest</option>
+                </select>
+                <a href="/submit" class="mox-btn-primary" style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; padding: 6px 14px;">
+                    <i class="bi bi-plus-lg"></i> Add Tweet
+                </a>
+            </div>
+        </div>
+
+        @if (_model.Tweets.Count > 0)
+        {
+            @foreach (var tweet in _model.Tweets)
+            {
+                <div style="margin-bottom: 16px;">
+                    <TweetCard Tweet="@tweet"
+                               ShowScreenshot="true"
+                               ShowCapture="true"
+                               ShowFolders="true"
+                               OnVote="@(() => HandleVote(tweet.Id))" />
+                </div>
+            }
+
+            <Pagination CurrentPage="@_model.CurrentPage"
+                        TotalPages="@_model.TotalPages"
+                        OnPageChange="@HandlePageChange" />
+        }
+        else
+        {
+            <EmptyState Icon="bi-chat-square-text"
+                        Title="No tweets in this folder"
+                        Description="Add tweets to this folder to start building your collection." />
+        }
+    </div>
+}
+
+@code {
+    private FolderDetailPageModel? _model;
+    private bool _loading = true;
+    private string _sort = "votes";
+    private int _page = 1;
+    private const int PageSize = 20;
+
+    [Parameter]
+    public Guid FolderId { get; set; }
+
+    [Inject]
+    private FolderDetailOrchestrator Orchestrator { get; set; } = default!;
+
+    [Inject]
+    private NavigationManager Navigation { get; set; } = default!;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _loading = true;
+        _model = await Orchestrator.GetAsync(FolderId, _sort, _page, PageSize);
+        if (_model is not null)
+        {
+            _sort = _model.Sort;
+        }
+
+        _loading = false;
+    }
+
+    private async Task ReloadData()
+    {
+        _page = 1;
+        await LoadData();
+    }
+
+    private async Task HandlePageChange(int page)
+    {
+        _page = page;
+        await LoadData();
+    }
+
+    private async Task HandleVote(Guid tweetId)
+    {
+        await Task.CompletedTask;
+    }
+}

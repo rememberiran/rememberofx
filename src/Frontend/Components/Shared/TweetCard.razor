@@ -1,0 +1,96 @@
+<a href="/t/@Tweet.Id" class="tweet-card @(CompactMode ? "compact" : "")">
+    <div class="tweet-vote" @onclick:stopPropagation>
+        <VoteButton VoteCount="@Tweet.VoteCount" OnVote="HandleVote" />
+    </div>
+    <div class="tweet-body">
+        <div class="tweet-meta">
+            <span class="tweet-author">@@@Tweet.Author</span>
+            @if (Tweet.AuthorDisplayName is not null)
+            {
+                <span class="tweet-display-name">@Tweet.AuthorDisplayName</span>
+            }
+            <span class="tweet-sep">&middot;</span>
+            <span class="tweet-date">@Tweet.Date</span>
+            @if (ShowStatus)
+            {
+                @if (Tweet.IsDeleted)
+                {
+                    <span class="mox-status-deleted">Deleted from X</span>
+                }
+                else
+                {
+                    <span class="mox-status-live">Live on X</span>
+                }
+            }
+        </div>
+
+        @if (ShowCapture && Tweet.Capture is not null)
+        {
+            <div class="tweet-capture">
+                <i class="bi bi-shield-check"></i>
+                <span>Captured @Tweet.Capture.CapturedAt</span>
+                <span class="tweet-sep">&middot;</span>
+                <span>by @@@Tweet.Capture.CapturedBy</span>
+            </div>
+        }
+
+        @if (Tweet.IsDeleted)
+        {
+            <div class="tweet-deleted-badge">
+                <i class="bi bi-exclamation-triangle-fill"></i> This tweet has been deleted from X
+            </div>
+        }
+
+        <div class="tweet-text">@Tweet.Text</div>
+
+        @if (ShowScreenshot && Tweet.ScreenshotUrl is not null)
+        {
+            <div class="tweet-screenshot">
+                <img src="@Tweet.ScreenshotUrl" alt="Tweet screenshot" loading="lazy" />
+            </div>
+        }
+
+        @if (Tweet.Tags.Count > 0)
+        {
+            <div class="tweet-tags">
+                @foreach (var tag in Tweet.Tags)
+                {
+                    <TagChip Tag="@tag" />
+                }
+            </div>
+        }
+
+        @if (ShowFolders && Tweet.Folders.Count > 0)
+        {
+            <TweetFolders Folders="@Tweet.Folders" />
+        }
+    </div>
+</a>
+
+@code {
+    [Parameter]
+    public TweetViewModel Tweet { get; set; } = default!;
+
+    [Parameter]
+    public bool ShowScreenshot { get; set; }
+
+    [Parameter]
+    public bool ShowCapture { get; set; } = true;
+
+    [Parameter]
+    public bool ShowFolders { get; set; } = true;
+
+    [Parameter]
+    public bool ShowStatus { get; set; }
+
+    [Parameter]
+    public bool CompactMode { get; set; }
+
+    [Parameter]
+    public EventCallback<Guid> OnVote { get; set; }
+
+    private async Task HandleVote()
+    {
+        await OnVote.InvokeAsync(Tweet.Id);
+    }
+}

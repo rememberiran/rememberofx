@@ -1,0 +1,17 @@
+<div class="toast-container @(Visible ? "show" : "")">
+    <div class="toast-content">
+        <i class="bi @Icon"></i>
+        <span>@Message</span>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public string Message { get; set; } = "";
+
+    [Parameter]
+    public string Icon { get; set; } = "bi-check-circle-fill";
+
+    [Parameter]
+    public bool Visible { get; set; }
+}

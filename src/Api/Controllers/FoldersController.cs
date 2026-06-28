@@ -15,15 +15,18 @@ namespace Api.Controllers;
 public class FoldersController : ControllerBase
 {
     private readonly IFolderService _folderService;
+    private readonly IVoteService _voteService;
     private readonly IAsyncContext<IdentityContext> _identityContext;
     private readonly TweetDtoMapper _tweetDtoMapper;
 
     public FoldersController(
         IFolderService folderService,
+        IVoteService voteService,
         IAsyncContext<IdentityContext> identityContext,
         TweetDtoMapper tweetDtoMapper)
     {
         _folderService = folderService;
+        _voteService = voteService;
         _identityContext = identityContext;
         _tweetDtoMapper = tweetDtoMapper;
     }
@@ -34,6 +37,28 @@ public class FoldersController : ControllerBase
     {
         var result = await _folderService.ListRootFoldersAsync(ct);
 
+        if (!result.IsSuccess)
+        {
+            return result.ToActionResult();
+        }
+
+        var dtos = result.Value!.Select(FolderDtoMapper.ToSummaryDto).ToList();
+        return Ok(dtos);
+    }
+
+    [HttpGet("mine")]
+    [Authorize(Roles = "Contributor,Admin")]
+    [ProducesResponseType(typeof(List<FolderSummaryDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> ListMine(CancellationToken ct)
+    {
+        var userId = _identityContext.Value?.InternalUserId;
+        if (userId is null)
+        {
+            return Unauthorized();
+        }
+
+        var result = await _folderService.ListByCreatorAsync(userId.Value, ct);
         if (!result.IsSuccess)
         {
             return result.ToActionResult();
@@ -56,8 +81,11 @@ public class FoldersController : ControllerBase
         }
 
         var folder = result.Value!;
+        var childrenResult = await _folderService.GetChildrenAsync(id, ct);
+        var children = childrenResult.IsSuccess
+            ? childrenResult.Value!.Select(FolderDtoMapper.ToSummaryDto).ToList()
+            : new List<FolderSummaryDto>();
         var activeChildren = folder.Children.Where(c => c.IsActive).ToList();
-        var children = activeChildren.Select(c => FolderDtoMapper.ToSummaryDto(c, 0)).ToList();
 
         var breadcrumb = new List<FolderBreadcrumbDto>();
         var current = folder;
@@ -105,7 +133,20 @@ public class FoldersController : ControllerBase
         }
 
         var data = result.Value!;
-        var items = _tweetDtoMapper.ToDtoList(data.Items);
+
+        var userId = _identityContext.Value?.InternalUserId;
+        HashSet<Guid>? votedIds = null;
+        if (userId.HasValue)
+        {
+            var tweetIds = data.Items.Select(i => i.Tweet.Id).ToList();
+            var votedResult = await _voteService.GetVotedTweetIdsAsync(userId.Value, tweetIds, ct);
+            if (votedResult.IsSuccess)
+            {
+                votedIds = votedResult.Value;
+            }
+        }
+
+        var items = _tweetDtoMapper.ToDtoList(data.Items, votedIds);
         return Ok(new FolderTweetsResponse(items, data.TotalCount));
     }
 
@@ -123,7 +164,7 @@ public class FoldersController : ControllerBase
         }
 
         var result = await _folderService.CreateAsync(
-            request.Name, request.Description, request.ParentFolderId, ct);
+            request.Name, request.Description, request.Icon, request.ParentFolderId, ct);
 
         if (!result.IsSuccess)
         {
@@ -141,7 +182,7 @@ public class FoldersController : ControllerBase
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateFolderRequest request, CancellationToken ct)
     {
-        var result = await _folderService.UpdateAsync(id, request.Name, request.Description, request.ParentFolderId, ct);
+        var result = await _folderService.UpdateAsync(id, request.Name, request.Description, request.Icon, request.ParentFolderId, ct);
 
         if (!result.IsSuccess)
         {

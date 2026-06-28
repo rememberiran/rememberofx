@@ -18,6 +18,7 @@ public class FolderService : IFolderService
     private static readonly EventId FolderUpdatedEvent = new(1021, "FolderUpdated");
     private static readonly EventId TweetAddedToFolderEvent = new(1022, "TweetAddedToFolder");
     private static readonly EventId TweetRemovedFromFolderEvent = new(1023, "TweetRemovedFromFolder");
+    private static readonly EventId FoldersListedByCreatorEvent = new(1024, "FoldersListedByCreator");
 
     private readonly ILogger<FolderService> _logger;
 
@@ -38,10 +39,30 @@ public class FolderService : IFolderService
         var folders = await _db.Folders.AsNoTracking()
             .Include(f => f.CreatedByUser)
             .Where(f => f.ParentFolderId == null && f.IsActive)
-            .Select(f => new { Record = f, ChildCount = f.Children.Count(c => c.IsActive) })
+            .Select(f => new { Record = f, ChildCount = f.Children.Count(c => c.IsActive), TweetCount = f.FolderTweets.Count })
             .ToListAsync(ct);
 
-        return Result.Success(folders.Select(f => new FolderSummary(FolderMapper.ToDomain(f.Record), f.ChildCount)).ToList());
+        return Result.Success(folders.Select(f => new FolderSummary(FolderMapper.ToDomain(f.Record), f.ChildCount, f.TweetCount)).ToList());
+    }
+
+    public async Task<Result<List<FolderSummary>>> ListByCreatorAsync(Guid userId, CancellationToken ct)
+    {
+        var folders = await _db.Folders.AsNoTracking()
+            .Include(f => f.CreatedByUser)
+            .Where(f => f.CreatedByUserId == userId && f.IsActive)
+            .Select(f => new
+            {
+                Record = f,
+                ChildCount = f.Children.Count(c => c.IsActive),
+                TweetCount = f.FolderTweets.Count,
+            })
+            .ToListAsync(ct);
+
+        _logger.LogInformation(FoldersListedByCreatorEvent, "Listed {FolderCount} folders for user {UserId}", folders.Count, userId);
+
+        return Result.Success(folders
+            .Select(f => new FolderSummary(FolderMapper.ToDomain(f.Record), f.ChildCount, f.TweetCount))
+            .ToList());
     }
 
     public async Task<Result<Folder>> GetByIdAsync(Guid id, CancellationToken ct)
@@ -79,10 +100,10 @@ public class FolderService : IFolderService
         var children = await _db.Folders.AsNoTracking()
             .Include(f => f.CreatedByUser)
             .Where(f => f.ParentFolderId == id && f.IsActive)
-            .Select(f => new { Record = f, ChildCount = f.Children.Count(c => c.IsActive) })
+            .Select(f => new { Record = f, ChildCount = f.Children.Count(c => c.IsActive), TweetCount = f.FolderTweets.Count })
             .ToListAsync(ct);
 
-        return Result.Success(children.Select(f => new FolderSummary(FolderMapper.ToDomain(f.Record), f.ChildCount)).ToList());
+        return Result.Success(children.Select(f => new FolderSummary(FolderMapper.ToDomain(f.Record), f.ChildCount, f.TweetCount)).ToList());
     }
 
     public async Task<Result<PagedResult<TweetWithAuthor>>> GetTweetsAsync(Guid folderId, string sort, int page, int pageSize, CancellationToken ct)
@@ -93,10 +114,15 @@ public class FolderService : IFolderService
             return Result.Failure<PagedResult<TweetWithAuthor>>(DomainError.NotFound($"Folder not found"));
         }
 
-        var query = _db.FolderTweets
+        var folderTweetIds = _db.FolderTweets
             .Where(ft => ft.FolderId == folderId)
-            .Join(_db.Tweets, ft => ft.TweetId, t => t.Id, (ft, t) => t)
-            .Where(t => t.FetchStatus == "Ok")
+            .Select(ft => ft.TweetId);
+
+        var query = _db.Tweets
+            .Where(t => folderTweetIds.Contains(t.Id) && t.FetchStatus == "Ok")
+            .Include(t => t.SubmittedByUser)
+            .Include(t => t.FolderTweets)
+                .ThenInclude(ft => ft.Folder)
             .AsNoTracking();
 
         var totalCount = await query.CountAsync(ct);
@@ -126,7 +152,7 @@ public class FolderService : IFolderService
         return Result.Success(new PagedResult<TweetWithAuthor>(items, totalCount));
     }
 
-    public async Task<Result<Folder>> CreateAsync(string name, string? description, Guid? parentFolderId, CancellationToken ct)
+    public async Task<Result<Folder>> CreateAsync(string name, string? description, string? icon, Guid? parentFolderId, CancellationToken ct)
     {
         if (parentFolderId.HasValue)
         {
@@ -160,6 +186,7 @@ public class FolderService : IFolderService
             Id = Guid.NewGuid(),
             Name = name,
             Description = description,
+            Icon = icon,
             ParentFolderId = parentFolderId,
             CreatedByUserId = userId.Value,
         };
@@ -171,7 +198,7 @@ public class FolderService : IFolderService
         return Result.Success(FolderMapper.ToDomain(folder));
     }
 
-    public async Task<Result<Folder>> UpdateAsync(Guid id, string? name, string? description, Guid? parentFolderId, CancellationToken ct)
+    public async Task<Result<Folder>> UpdateAsync(Guid id, string? name, string? description, string? icon, Guid? parentFolderId, CancellationToken ct)
     {
         var folder = await _db.Folders
             .Include(f => f.CreatedByUser)
@@ -212,6 +239,11 @@ public class FolderService : IFolderService
         if (description != null)
         {
             folder.Description = description;
+        }
+
+        if (icon != null)
+        {
+            folder.Icon = icon;
         }
 
         _logger.LogInformation(FolderUpdatedEvent, "Folder updated: {FolderId}", id);

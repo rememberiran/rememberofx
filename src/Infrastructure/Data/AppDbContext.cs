@@ -64,6 +64,7 @@ public class AppDbContext : DbContext, IAppDbContext
             e.HasIndex(f => f.ParentFolderId);
             e.Property(f => f.Name).HasMaxLength(200);
             e.Property(f => f.Description).HasMaxLength(1000);
+            e.Property(f => f.Icon).HasMaxLength(50);
             e.HasOne(f => f.ParentFolder)
              .WithMany(f => f.Children)
              .HasForeignKey(f => f.ParentFolderId)

@@ -1,0 +1,21 @@
+<div class="skeleton-list">
+    @for (var i = 0; i < Count; i++)
+    {
+        <div class="skeleton-card">
+            <div class="skeleton-vote">
+                <div class="skeleton-rect skeleton-vote-btn"></div>
+                <div class="skeleton-rect skeleton-vote-count"></div>
+            </div>
+            <div class="skeleton-body">
+                <div class="skeleton-rect skeleton-line-short"></div>
+                <div class="skeleton-rect skeleton-line-full"></div>
+                <div class="skeleton-rect skeleton-line-medium"></div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public int Count { get; set; } = 4;
+}
