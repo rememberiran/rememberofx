@@ -18,4 +18,15 @@ public interface IFolderService
     Task<Result<List<FolderSummary>>> SearchFoldersAsync(string query, CancellationToken ct);
     Task<Result<List<FolderSummary>>> GetValidMoveTargetsAsync(Guid folderId, CancellationToken ct);
     Task<Result<int>> GetDepthAsync(Guid folderId, CancellationToken ct);
+
+    Task<Result<List<TrustedContributor>>> GetTrustedContributorsAsync(CancellationToken ct);
+    Task<Result> AddTrustedContributorAsync(string trustedXUsername, CancellationToken ct);
+    Task<Result> RemoveTrustedContributorAsync(string trustedXUsername, CancellationToken ct);
+
+    Task<Result<List<PendingSubmission>>> GetPendingSubmissionsAsync(CancellationToken ct);
+    Task<Result> ApproveSubmissionAsync(Guid folderId, Guid tweetId, CancellationToken ct);
+    Task<Result> RejectSubmissionAsync(Guid folderId, Guid tweetId, CancellationToken ct);
+
+    Task<Result<ContributionStats>> GetContributionStatsAsync(CancellationToken ct);
+    Task<Result<ContributionStats>> GetFolderContributionStatsAsync(Guid folderId, CancellationToken ct);
 }

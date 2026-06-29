@@ -262,4 +262,18 @@ public class FoldersController : ControllerBase
         var result = await _folderService.RemoveTweetAsync(folderId, tweetId, ct);
         return result.IsSuccess ? NoContent() : result.ToActionResult();
     }
+
+    [HttpGet("{id:guid}/contribution-stats")]
+    [ProducesResponseType(typeof(ContributionStatsResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetContributionStats(Guid id, CancellationToken ct)
+    {
+        var result = await _folderService.GetFolderContributionStatsAsync(id, ct);
+        if (!result.IsSuccess)
+        {
+            return result.ToActionResult();
+        }
+
+        return Ok(new ContributionStatsResponse(result.Value!.AddedByOwner, result.Value.ContributedByCommunity));
+    }
 }

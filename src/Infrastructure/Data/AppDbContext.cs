@@ -19,6 +19,7 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<TweetMediaRecord> TweetMedia => Set<TweetMediaRecord>();
     public DbSet<AuditLogRecord> AuditLogs => Set<AuditLogRecord>();
     public DbSet<FolderClosureRecord> FolderClosures => Set<FolderClosureRecord>();
+    public DbSet<TrustedContributorRecord> TrustedContributors => Set<TrustedContributorRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -47,6 +48,7 @@ public class AppDbContext : DbContext, IAppDbContext
             e.Property(t => t.ScrapeError).HasMaxLength(1000);
             e.Property(t => t.SubmittedByIp).HasMaxLength(50);
             e.Property(t => t.FetchStatus).HasMaxLength(20);
+            e.Property(t => t.IsAnonymous).HasDefaultValue(false);
         });
 
         modelBuilder.Entity<XUserProfileRecord>(e =>
@@ -77,6 +79,7 @@ public class AppDbContext : DbContext, IAppDbContext
         {
             e.ToTable($"FolderTweets");
             e.HasKey(ft => new { ft.FolderId, ft.TweetId });
+            e.Property(ft => ft.Status).HasMaxLength(10).HasDefaultValue("approved");
         });
 
         modelBuilder.Entity<FolderClosureRecord>(e =>
@@ -124,6 +127,17 @@ public class AppDbContext : DbContext, IAppDbContext
             e.Property(a => a.EntityId).HasMaxLength(50);
             e.Property(a => a.IpAddress).HasMaxLength(50);
             e.Property(a => a.Region).HasMaxLength(100);
+        });
+
+        modelBuilder.Entity<TrustedContributorRecord>(e =>
+        {
+            e.ToTable("TrustedContributors");
+            e.HasKey(tc => new { tc.OwnerUserId, tc.TrustedXUsername });
+            e.Property(tc => tc.TrustedXUsername).HasMaxLength(100);
+            e.HasOne(tc => tc.OwnerUser)
+             .WithMany()
+             .HasForeignKey(tc => tc.OwnerUserId)
+             .OnDelete(DeleteBehavior.Restrict);
         });
     }
 }

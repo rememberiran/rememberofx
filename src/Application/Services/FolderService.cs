@@ -21,6 +21,10 @@ public class FolderService : IFolderService
     private static readonly EventId FoldersListedByCreatorEvent = new(1024, "FoldersListedByCreator");
     private static readonly EventId FolderDeletedEvent = new(1025, "FolderDeleted");
     private static readonly EventId FoldersSearchedEvent = new(1026, "FoldersSearched");
+    private static readonly EventId TrustedContributorAddedEvent = new(1027, "TrustedContributorAdded");
+    private static readonly EventId TrustedContributorRemovedEvent = new(1028, "TrustedContributorRemoved");
+    private static readonly EventId SubmissionApprovedEvent = new(1029, "SubmissionApproved");
+    private static readonly EventId SubmissionRejectedEvent = new(1030, "SubmissionRejected");
 
     private readonly ILogger<FolderService> _logger;
 
@@ -129,7 +133,7 @@ public class FolderService : IFolderService
         }
 
         var folderTweetIds = _db.FolderTweets
-            .Where(ft => ft.FolderId == folderId)
+            .Where(ft => ft.FolderId == folderId && ft.Status == "approved")
             .Select(ft => ft.TweetId);
 
         var query = _db.Tweets
@@ -340,8 +344,8 @@ public class FolderService : IFolderService
             return Result.Failure<Folder>(DomainError.Unauthorized("User not authenticated"));
         }
 
-        var folderExists = await _db.Folders.AnyAsync(f => f.Id == folderId && f.IsActive, ct);
-        if (!folderExists)
+        var folder = await _db.Folders.AsNoTracking().FirstOrDefaultAsync(f => f.Id == folderId && f.IsActive, ct);
+        if (folder is null)
         {
             return Result.Failure(DomainError.NotFound($"Folder not found"));
         }
@@ -364,14 +368,36 @@ public class FolderService : IFolderService
             return Result.Failure(DomainError.Validation($"Maximum of {_settings.MaxTweetsPerFolder} tweets per folder exceeded"));
         }
 
+        var isOwner = folder.CreatedByUserId == userId.Value;
+
+        if (string.Equals(folder.Visibility, "private", StringComparison.Ordinal) && !isOwner)
+        {
+            return Result.Failure(DomainError.Forbidden("Only the folder owner can add tweets to a private folder"));
+        }
+
+        var status = "approved";
+        if (!isOwner)
+        {
+            var callerXUsername = _identityContext.Value?.XUsername;
+            var isTrusted = callerXUsername != null && await _db.TrustedContributors.AnyAsync(
+                tc => tc.OwnerUserId == folder.CreatedByUserId && tc.TrustedXUsername == callerXUsername,
+                ct);
+
+            if (!isTrusted)
+            {
+                status = "pending";
+            }
+        }
+
         _db.FolderTweets.Add(new FolderTweetRecord
         {
             FolderId = folderId,
             TweetId = tweetId,
             AddedByUserId = userId.Value,
+            Status = status,
         });
 
-        _logger.LogInformation(TweetAddedToFolderEvent, "Tweet {TweetId} added to folder {FolderId}", tweetId, folderId);
+        _logger.LogInformation(TweetAddedToFolderEvent, "Tweet {TweetId} added to folder {FolderId} with status {Status}", tweetId, folderId, status);
         return Result.Success();
     }
 
@@ -539,6 +565,237 @@ public class FolderService : IFolderService
             .MaxAsync(fc => (int?)fc.Depth, ct) ?? 0;
 
         return Result.Success(depth + 1);
+    }
+
+    public async Task<Result<List<TrustedContributor>>> GetTrustedContributorsAsync(CancellationToken ct)
+    {
+        var userId = _identityContext.Value?.InternalUserId;
+        if (userId is null)
+        {
+            return Result.Failure<List<TrustedContributor>>(DomainError.Unauthorized("User not authenticated"));
+        }
+
+        var records = await _db.TrustedContributors.AsNoTracking()
+            .Where(tc => tc.OwnerUserId == userId.Value)
+            .OrderBy(tc => tc.TrustedXUsername)
+            .ToListAsync(ct);
+
+        return Result.Success(records.Select(TrustedContributorMapper.ToDomain).ToList());
+    }
+
+    public async Task<Result> AddTrustedContributorAsync(string trustedXUsername, CancellationToken ct)
+    {
+        var userId = _identityContext.Value?.InternalUserId;
+        if (userId is null)
+        {
+            return Result.Failure(DomainError.Unauthorized("User not authenticated"));
+        }
+
+        var exists = await _db.TrustedContributors.AnyAsync(
+            tc => tc.OwnerUserId == userId.Value && tc.TrustedXUsername == trustedXUsername,
+            ct);
+
+        if (exists)
+        {
+            return Result.Failure(DomainError.Conflict("User is already trusted"));
+        }
+
+        _db.TrustedContributors.Add(new TrustedContributorRecord
+        {
+            OwnerUserId = userId.Value,
+            TrustedXUsername = trustedXUsername,
+        });
+
+        _logger.LogInformation(TrustedContributorAddedEvent, "Trusted contributor {TrustedXUsername} added by user {UserId}", trustedXUsername, userId);
+        return Result.Success();
+    }
+
+    public async Task<Result> RemoveTrustedContributorAsync(string trustedXUsername, CancellationToken ct)
+    {
+        var userId = _identityContext.Value?.InternalUserId;
+        if (userId is null)
+        {
+            return Result.Failure(DomainError.Unauthorized("User not authenticated"));
+        }
+
+        var record = await _db.TrustedContributors.FirstOrDefaultAsync(
+            tc => tc.OwnerUserId == userId.Value && tc.TrustedXUsername == trustedXUsername,
+            ct);
+
+        if (record is null)
+        {
+            return Result.Failure(DomainError.NotFound("Trusted contributor not found"));
+        }
+
+        _db.TrustedContributors.Remove(record);
+
+        _logger.LogInformation(TrustedContributorRemovedEvent, "Trusted contributor {TrustedXUsername} removed by user {UserId}", trustedXUsername, userId);
+        return Result.Success();
+    }
+
+    public async Task<Result<List<PendingSubmission>>> GetPendingSubmissionsAsync(CancellationToken ct)
+    {
+        var userId = _identityContext.Value?.InternalUserId;
+        if (userId is null)
+        {
+            return Result.Failure<List<PendingSubmission>>(DomainError.Unauthorized("User not authenticated"));
+        }
+
+        var pendingFolderTweets = await _db.FolderTweets.AsNoTracking()
+            .Include(ft => ft.Folder)
+            .Include(ft => ft.Tweet)
+                .ThenInclude(t => t.SubmittedByUser)
+            .Where(ft => ft.Status == "pending" && ft.Folder.CreatedByUserId == userId.Value && ft.Folder.IsActive)
+            .ToListAsync(ct);
+
+        var tweetIds = pendingFolderTweets.Select(ft => ft.TweetId).Distinct().ToList();
+
+        var authorIds = pendingFolderTweets
+            .Where(ft => ft.Tweet.AuthorXUserId != null)
+            .Select(ft => ft.Tweet.AuthorXUserId!)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+        var profiles = authorIds.Count > 0
+            ? await _db.XUserProfiles.AsNoTracking()
+                .Where(p => authorIds.Contains(p.XUserId))
+                .ToDictionaryAsync(p => p.XUserId, ct)
+            : new Dictionary<string, XUserProfileRecord>(StringComparer.Ordinal);
+
+        var grouped = pendingFolderTweets
+            .GroupBy(ft => ft.TweetId)
+            .Select(g =>
+            {
+                var firstFt = g.First();
+                var tweet = TweetMapper.ToDomain(firstFt.Tweet);
+                var authorProfile = profiles.GetValueOrDefault(firstFt.Tweet.AuthorXUserId ?? string.Empty);
+                var tweetWithAuthor = new TweetWithAuthor(
+                    tweet,
+                    authorProfile != null ? XUserProfileMapper.ToDomain(authorProfile) : null);
+
+                var folders = g.Select(ft => new PendingFolder(ft.FolderId, ft.Folder.Name, ft.AddedAt)).ToList();
+
+                return new PendingSubmission(tweetWithAuthor, folders);
+            })
+            .ToList();
+
+        return Result.Success(grouped);
+    }
+
+    public async Task<Result> ApproveSubmissionAsync(Guid folderId, Guid tweetId, CancellationToken ct)
+    {
+        var userId = _identityContext.Value?.InternalUserId;
+        if (userId is null)
+        {
+            return Result.Failure(DomainError.Unauthorized("User not authenticated"));
+        }
+
+        var folderTweet = await _db.FolderTweets
+            .Include(ft => ft.Folder)
+            .FirstOrDefaultAsync(ft => ft.FolderId == folderId && ft.TweetId == tweetId, ct);
+
+        if (folderTweet is null)
+        {
+            return Result.Failure(DomainError.NotFound("Submission not found"));
+        }
+
+        if (folderTweet.Folder.CreatedByUserId != userId.Value)
+        {
+            return Result.Failure(DomainError.Forbidden("Only the folder owner can approve submissions"));
+        }
+
+        if (!string.Equals(folderTweet.Status, "pending", StringComparison.Ordinal))
+        {
+            return Result.Failure(DomainError.Validation("Submission is not pending"));
+        }
+
+        folderTweet.Status = "approved";
+        folderTweet.ReviewedAt = DateTime.UtcNow;
+
+        _logger.LogInformation(SubmissionApprovedEvent, "Submission approved: tweet {TweetId} in folder {FolderId} by user {UserId}", tweetId, folderId, userId);
+        return Result.Success();
+    }
+
+    public async Task<Result> RejectSubmissionAsync(Guid folderId, Guid tweetId, CancellationToken ct)
+    {
+        var userId = _identityContext.Value?.InternalUserId;
+        if (userId is null)
+        {
+            return Result.Failure(DomainError.Unauthorized("User not authenticated"));
+        }
+
+        var folderTweet = await _db.FolderTweets
+            .Include(ft => ft.Folder)
+            .FirstOrDefaultAsync(ft => ft.FolderId == folderId && ft.TweetId == tweetId, ct);
+
+        if (folderTweet is null)
+        {
+            return Result.Failure(DomainError.NotFound("Submission not found"));
+        }
+
+        if (folderTweet.Folder.CreatedByUserId != userId.Value)
+        {
+            return Result.Failure(DomainError.Forbidden("Only the folder owner can reject submissions"));
+        }
+
+        if (!string.Equals(folderTweet.Status, "pending", StringComparison.Ordinal))
+        {
+            return Result.Failure(DomainError.Validation("Submission is not pending"));
+        }
+
+        folderTweet.Status = "rejected";
+        folderTweet.ReviewedAt = DateTime.UtcNow;
+
+        _logger.LogInformation(SubmissionRejectedEvent, "Submission rejected: tweet {TweetId} in folder {FolderId} by user {UserId}", tweetId, folderId, userId);
+        return Result.Success();
+    }
+
+    public async Task<Result<ContributionStats>> GetContributionStatsAsync(CancellationToken ct)
+    {
+        var userId = _identityContext.Value?.InternalUserId;
+        if (userId is null)
+        {
+            return Result.Failure<ContributionStats>(DomainError.Unauthorized("User not authenticated"));
+        }
+
+        var myFolderIds = await _db.Folders.AsNoTracking()
+            .Where(f => f.CreatedByUserId == userId.Value && f.IsActive)
+            .Select(f => f.Id)
+            .ToListAsync(ct);
+
+        if (myFolderIds.Count == 0)
+        {
+            return Result.Success(new ContributionStats(0, 0));
+        }
+
+        var addedByOwner = await _db.FolderTweets.CountAsync(
+            ft => myFolderIds.Contains(ft.FolderId) && ft.AddedByUserId == userId.Value && ft.Status == "approved",
+            ct);
+
+        var contributedByCommunity = await _db.FolderTweets.CountAsync(
+            ft => myFolderIds.Contains(ft.FolderId) && ft.AddedByUserId != userId.Value && ft.Status == "approved",
+            ct);
+
+        return Result.Success(new ContributionStats(addedByOwner, contributedByCommunity));
+    }
+
+    public async Task<Result<ContributionStats>> GetFolderContributionStatsAsync(Guid folderId, CancellationToken ct)
+    {
+        var folder = await _db.Folders.AsNoTracking().FirstOrDefaultAsync(f => f.Id == folderId && f.IsActive, ct);
+        if (folder is null)
+        {
+            return Result.Failure<ContributionStats>(DomainError.NotFound("Folder not found"));
+        }
+
+        var addedByOwner = await _db.FolderTweets.CountAsync(
+            ft => ft.FolderId == folderId && ft.AddedByUserId == folder.CreatedByUserId && ft.Status == "approved",
+            ct);
+
+        var contributedByCommunity = await _db.FolderTweets.CountAsync(
+            ft => ft.FolderId == folderId && ft.AddedByUserId != folder.CreatedByUserId && ft.Status == "approved",
+            ct);
+
+        return Result.Success(new ContributionStats(addedByOwner, contributedByCommunity));
     }
 
     private async Task<List<Folder>> GetBreadcrumbAsync(FolderRecord folder, CancellationToken ct)

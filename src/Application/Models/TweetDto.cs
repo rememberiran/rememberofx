@@ -17,7 +17,8 @@ public record TweetDto(
     XUserProfileDto? AuthorProfile = null,
     IReadOnlyList<TweetFolderDto>? Folders = null,
     string? SubmittedByUsername = null,
-    bool IsVotedByMe = false);
+    bool IsVotedByMe = false,
+    bool IsAnonymous = false);
 
 public record TweetFolderDto(Guid FolderId, string FolderName);
 

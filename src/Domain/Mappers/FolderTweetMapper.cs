@@ -13,6 +13,8 @@ public static class FolderTweetMapper
             TweetId = record.TweetId,
             AddedByUserId = record.AddedByUserId,
             AddedAt = record.AddedAt,
+            Status = record.Status,
+            ReviewedAt = record.ReviewedAt,
             Folder = record.Folder is not null ? FolderMapper.ToDomain(record.Folder) : null!,
             Tweet = record.Tweet is not null ? TweetMapper.ToDomain(record.Tweet) : null!,
             AddedByUser = record.AddedByUser is not null ? UserMapper.ToDomain(record.AddedByUser) : null!,
@@ -27,6 +29,8 @@ public static class FolderTweetMapper
             TweetId = entity.TweetId,
             AddedByUserId = entity.AddedByUserId,
             AddedAt = entity.AddedAt,
+            Status = entity.Status,
+            ReviewedAt = entity.ReviewedAt,
         };
     }
 }

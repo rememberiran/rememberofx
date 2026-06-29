@@ -67,8 +67,8 @@
                                 </span>
                             </td>
                             <td>
-                                <span class="role-badge role-@user.Role.ToLowerInvariant()">
-                                    @user.Role
+                                <span class="role-badge role-@((user.Role ?? "user").ToLowerInvariant())">
+                                    @(user.Role ?? "User")
                                 </span>
                             </td>
                             <td>
@@ -209,7 +209,7 @@
     {
         _editingUser = user;
         _modalXUserId = user.XUserId;
-        _modalRole = user.Role;
+        _modalRole = user.Role ?? string.Empty;
         _modalOpen = true;
     }
 

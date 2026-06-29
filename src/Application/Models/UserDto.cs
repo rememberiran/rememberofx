@@ -4,6 +4,6 @@ public record UserDto(
     Guid Id,
     string XUserId,
     string XUsername,
-    string Role,
+    string? Role,
     bool IsActive,
     DateTime CreatedAt);

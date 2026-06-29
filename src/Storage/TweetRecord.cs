@@ -19,6 +19,7 @@ public class TweetRecord
     public string SubmittedByIp { get; set; } = default!;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? ScrapedAt { get; set; }
+    public bool IsAnonymous { get; set; }
 
     public UserRecord? SubmittedByUser { get; set; }
     public ICollection<TweetMediaRecord> Media { get; set; } = new List<TweetMediaRecord>();

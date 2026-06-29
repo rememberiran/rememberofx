@@ -7,4 +7,5 @@ public class SubmitTweetRequest
     [Required]
     public string TweetUrl { get; set; } = default!;
     public IReadOnlyList<Guid>? FolderIds { get; set; }
+    public bool IsAnonymous { get; set; }
 }

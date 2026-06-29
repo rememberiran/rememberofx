@@ -5,5 +5,6 @@ namespace Application.Interfaces;
 
 public interface ITweetSubmissionService
 {
-    Task<Result<Tweet>> SubmitAsync(SubmitTweetCommand command, CancellationToken ct);
+    Task<Result<SubmissionResultWithQuota>> SubmitAsync(SubmitTweetCommand command, CancellationToken ct);
+    Task<Result<SubmissionQuota>> GetQuotaAsync(CancellationToken ct);
 }

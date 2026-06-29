@@ -1,4 +1,5 @@
-﻿using Application.Interfaces;
+﻿using Application;
+using Application.Interfaces;
 using Application.Models;
 using Domain.Entities;
 
@@ -7,10 +8,12 @@ namespace Api.Mappers;
 public class TweetDtoMapper
 {
     private readonly IBlobStorageService _blobStorage;
+    private readonly IAsyncContext<IdentityContext> _identityContext;
 
-    public TweetDtoMapper(IBlobStorageService blobStorage)
+    public TweetDtoMapper(IBlobStorageService blobStorage, IAsyncContext<IdentityContext> identityContext)
     {
         _blobStorage = blobStorage;
+        _identityContext = identityContext;
     }
 
     public TweetDto ToDto(Tweet tweet, XUserProfile? authorProfile = null, IReadOnlySet<Guid>? votedTweetIds = null)
@@ -25,8 +28,15 @@ public class TweetDtoMapper
             .ToList();
 
         var folders = tweet.FolderTweets
+            .Where(ft => string.Equals(ft.Status, "approved", StringComparison.Ordinal))
             .Select(ft => new TweetFolderDto(ft.FolderId, ft.Folder.Name))
             .ToList();
+
+        var callerUserId = _identityContext.Value?.InternalUserId;
+        var isSubmitter = callerUserId.HasValue && tweet.SubmittedByUserId == callerUserId.Value;
+        var submittedByUsername = tweet.IsAnonymous && !isSubmitter
+            ? null
+            : tweet.SubmittedByUser?.XUsername;
 
         return new TweetDto(
             tweet.Id,
@@ -44,8 +54,9 @@ public class TweetDtoMapper
             media,
             authorProfile != null ? XUserProfileDtoMapper.ToDto(authorProfile) : null,
             folders,
-            SubmittedByUsername: tweet.SubmittedByUser?.XUsername,
-            IsVotedByMe: votedTweetIds?.Contains(tweet.Id) ?? false);
+            SubmittedByUsername: submittedByUsername,
+            IsVotedByMe: votedTweetIds?.Contains(tweet.Id) ?? false,
+            IsAnonymous: tweet.IsAnonymous);
     }
 
     public TweetDto ToDto(TweetWithAuthor tweetWithAuthor, IReadOnlySet<Guid>? votedTweetIds = null)

@@ -49,7 +49,7 @@ public record UserViewModel(
     Guid Id,
     string XUsername,
     string XUserId,
-    string Role,
+    string? Role,
     string Status,
     string Created);
 

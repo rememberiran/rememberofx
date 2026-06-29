@@ -18,7 +18,8 @@ public class IdentityMiddleware
 
     public async Task InvokeAsync(HttpContext context, IAsyncContext<IdentityContext> identityContext, IAppDbContext db)
     {
-        var ipAddress = context.Request.Headers[$"X-Forwarded-For"].FirstOrDefault()
+        var ipAddress = context.Request.Headers[$"X-Client-Ip"].FirstOrDefault()
+                        ?? context.Request.Headers[$"X-Forwarded-For"].FirstOrDefault()
                         ?? context.Connection.RemoteIpAddress?.ToString()
                         ?? "<unknown>";
 
@@ -38,13 +39,13 @@ public class IdentityMiddleware
             {
                 context.Response.StatusCode = StatusCodes.Status403Forbidden;
                 await context.Response.WriteAsJsonAsync(
-                    new { error = "Forbidden", message = "Access denied — your account is not registered or has been deactivated" },
+                    new { error = "Forbidden", message = "Access denied — your account has been deactivated" },
                     context.RequestAborted);
                 return;
             }
 
             internalUserId = dbUser.Id;
-            roles = [dbUser.Role];
+            roles = string.IsNullOrEmpty(dbUser.Role) ? [] : [dbUser.Role];
         }
 
         identityContext.Value = new IdentityContext

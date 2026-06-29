@@ -3,4 +3,5 @@
 public record SubmitTweetCommand(
     string TweetUrl,
     IReadOnlyList<Guid>? FolderIds,
-    Guid? SubmittedByUserId);
+    Guid? SubmittedByUserId,
+    bool IsAnonymous = false);

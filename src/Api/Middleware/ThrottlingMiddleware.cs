@@ -29,7 +29,8 @@ public sealed class ThrottlingMiddleware : IDisposable
                     });
             }
 
-            var ip = context.Request.Headers[$"X-Forwarded-For"].FirstOrDefault()
+            var ip = context.Request.Headers[$"X-Client-Ip"].FirstOrDefault()
+                     ?? context.Request.Headers[$"X-Forwarded-For"].FirstOrDefault()
                      ?? context.Connection.RemoteIpAddress?.ToString()
                      ?? $"unknown";
 

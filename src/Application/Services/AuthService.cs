@@ -20,6 +20,7 @@ public class AuthService : IAuthService
     private static readonly EventId AuthDeniedEvent = new(1001, "AuthDenied");
     private static readonly EventId DevTokenGeneratedEvent = new(1002, "DevTokenGenerated");
     private static readonly EventId JwtGeneratedEvent = new(1003, "JwtGenerated");
+    private static readonly EventId UserAutoRegisteredEvent = new(1004, "UserAutoRegistered");
 
     private readonly IAsyncContext<IdentityContext> _identityContext;
     private readonly ILogger<AuthService> _logger;
@@ -51,9 +52,17 @@ public class AuthService : IAuthService
 
         if (user is null)
         {
-            WriteAuditLog($"Auth.Denied", xUser.Id, ipAddress);
-            _logger.LogWarning(AuthDeniedEvent, "Auth denied for unregistered X user {XUserId}", xUser.Id);
-            return Result.Failure<AuthTokenResult>(DomainError.Forbidden($"Access denied — your X account is not registered"));
+            user = new UserRecord
+            {
+                Id = Guid.NewGuid(),
+                XUserId = xUser.Id,
+                XUsername = xUser.Username,
+            };
+            _db.Users.Add(user);
+            await _db.SaveChangesAsync(ct);
+
+            WriteAuditLog($"Auth.Register", user.XUserId, ipAddress);
+            _logger.LogInformation(UserAutoRegisteredEvent, "Auto-registered X user {XUserId} ({XUsername})", xUser.Id, xUser.Username);
         }
 
         if (!user.IsActive)
@@ -91,14 +100,18 @@ public class AuthService : IAuthService
         var now = DateTime.UtcNow;
         var expiresAt = now.AddHours(_jwt.ExpiryHours);
 
-        var claims = new[]
+        var claims = new List<Claim>
         {
-            new Claim(JwtRegisteredClaimNames.Sub, user.XUserId),
-            new Claim($"username", user.XUsername),
-            new Claim($"role", user.Role),
-            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-            new Claim(JwtRegisteredClaimNames.Iat, new DateTimeOffset(now).ToUnixTimeSeconds().ToString(System.Globalization.CultureInfo.InvariantCulture), ClaimValueTypes.Integer64),
+            new(JwtRegisteredClaimNames.Sub, user.XUserId),
+            new($"username", user.XUsername),
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            new(JwtRegisteredClaimNames.Iat, new DateTimeOffset(now).ToUnixTimeSeconds().ToString(System.Globalization.CultureInfo.InvariantCulture), ClaimValueTypes.Integer64),
         };
+
+        if (!string.IsNullOrEmpty(user.Role))
+        {
+            claims.Add(new Claim($"role", user.Role));
+        }
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwt.Secret));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);

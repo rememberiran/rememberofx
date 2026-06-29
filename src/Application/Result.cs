@@ -18,6 +18,7 @@ public class DomainError
     public static DomainError Forbidden(string message) => new($"FORBIDDEN", message, 403);
     public static DomainError NotFound(string message) => new("NOT_FOUND", message, 404);
     public static DomainError Conflict(string message) => new("CONFLICT", message, 409);
+    public static DomainError TooManyRequests(string message) => new("TOO_MANY_REQUESTS", message, 429);
 }
 
 public class Result

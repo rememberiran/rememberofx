@@ -27,6 +27,7 @@ public static class TweetMapper
             SubmittedByIp = record.SubmittedByIp,
             CreatedAt = record.CreatedAt,
             ScrapedAt = record.ScrapedAt,
+            IsAnonymous = record.IsAnonymous,
             SubmittedByUser = record.SubmittedByUser is not null ? UserMapper.ToDomain(record.SubmittedByUser) : null,
             Media = record.Media.Select(TweetMediaMapper.ToDomain).ToList(),
             FolderTweets = record.FolderTweets.Select(FolderTweetMapper.ToDomain).ToList(),
@@ -55,6 +56,7 @@ public static class TweetMapper
             SubmittedByIp = entity.SubmittedByIp,
             CreatedAt = entity.CreatedAt,
             ScrapedAt = entity.ScrapedAt,
+            IsAnonymous = entity.IsAnonymous,
         };
     }
 }
