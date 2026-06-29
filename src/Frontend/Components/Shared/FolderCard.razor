@@ -3,22 +3,35 @@
         <i class="bi @Folder.Icon"></i>
     </div>
     <div class="folder-info">
-        <h3 class="folder-name">@Folder.Name</h3>
+        <div style="display: flex; align-items: center; gap: 7px;">
+            <h3 class="folder-name">@Folder.Name</h3>
+            <span class="visibility-badge">
+                <i class="bi @(Folder.Visibility == "public" ? "bi-globe2" : "bi-lock-fill")"></i>
+                @(Folder.Visibility == "public" ? "Public" : "Private")
+            </span>
+        </div>
         @if (!string.IsNullOrEmpty(Folder.Description))
         {
             <p class="folder-desc">@Folder.Description</p>
+        }
+        @if (!string.IsNullOrEmpty(Folder.OwnerUsername))
+        {
+            <div class="folder-owner">
+                <span class="folder-owner-avatar">@Folder.OwnerInitial</span>
+                <span>Curated by <span class="folder-owner-handle">@@@Folder.OwnerUsername</span></span>
+            </div>
         }
         <div class="folder-footer">
             @if (Folder.SubfolderCount > 0)
             {
                 <span class="folder-badge">
-                    <i class="bi bi-folder"></i> @Folder.SubfolderCount
+                    <i class="bi bi-folder2"></i> @Folder.SubfolderCount subfolders
                 </span>
             }
             @if (ShowTweetCount)
             {
                 <span class="folder-badge">
-                    <i class="bi bi-chat-square-text"></i> @Folder.TweetCount
+                    <i class="bi bi-chat-square-text"></i> @Folder.TweetCount tweets
                 </span>
             }
             <i class="bi bi-chevron-right folder-chevron"></i>

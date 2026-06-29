@@ -1,4 +1,4 @@
-using Azure.Core;
+﻿using Azure.Core;
 
 namespace Application.Interfaces;
 

@@ -11,6 +11,12 @@ public record SearchTweetsApiResponse(
     int TotalCount,
     XUserProfileDto? SubjectProfile);
 
+public record SubmitterStatsApiResponse(
+    int SubmittedTweetCount,
+    int TotalVotesEarned,
+    int DeletedTweetsPreserved,
+    int CreatedFolderCount);
+
 public record SubmitTweetApiResponse(Guid TweetId, string FetchStatus);
 
 public record TweetStatusApiResponse(Guid TweetId, string FetchStatus);
@@ -241,11 +247,75 @@ public class ApiClient
         }
     }
 
-    public async Task<FolderDto?> CreateFolderAsync(string name, string? description, Guid? parentFolderId)
+    public async Task<bool> DeleteFolderAsync(Guid id)
     {
         try
         {
-            var body = new { Name = name, Description = description, ParentFolderId = parentFolderId };
+            var response = await _httpClient.DeleteAsync(new Uri($"api/folders/{id}", UriKind.Relative));
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to delete folder {FolderId}", id);
+            return false;
+        }
+    }
+
+    public async Task<FolderDto?> UpdateFolderAsync(
+        Guid id,
+        string? name,
+        string? description,
+        string? icon,
+        string? visibility,
+        Guid? parentFolderId)
+    {
+        try
+        {
+            var body = new { Name = name, Description = description, Icon = icon, Visibility = visibility, ParentFolderId = parentFolderId };
+            var response = await _httpClient.PutAsJsonAsync($"api/folders/{id}", body);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<FolderDto>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to update folder {FolderId}", id);
+            return null;
+        }
+    }
+
+    public async Task<IReadOnlyList<FolderSummaryDto>?> SearchFoldersAsync(string query)
+    {
+        try
+        {
+            return await _httpClient.GetFromJsonAsync<FolderSummaryDto[]>(
+                $"api/folders/search?q={Uri.EscapeDataString(query)}");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to search folders");
+            return null;
+        }
+    }
+
+    public async Task<IReadOnlyList<FolderSummaryDto>?> GetMoveTargetsAsync(Guid folderId)
+    {
+        try
+        {
+            return await _httpClient.GetFromJsonAsync<FolderSummaryDto[]>(
+                $"api/folders/{folderId}/move-targets");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get move targets for folder {FolderId}", folderId);
+            return null;
+        }
+    }
+
+    public async Task<FolderDto?> CreateFolderAsync(string name, string? description, Guid? parentFolderId, string? visibility = null)
+    {
+        try
+        {
+            var body = new { Name = name, Description = description, ParentFolderId = parentFolderId, Visibility = visibility };
             var response = await _httpClient.PostAsJsonAsync("api/folders", body);
             response.EnsureSuccessStatusCode();
             return await response.Content.ReadFromJsonAsync<FolderDto>();
@@ -282,6 +352,46 @@ public class ApiClient
         {
             _logger.LogError(ex, "Failed to remove tweet {TweetId} from folder {FolderId}", tweetId, folderId);
             return false;
+        }
+    }
+
+    public async Task<SubmitterStatsApiResponse?> GetMyStatsAsync()
+    {
+        try
+        {
+            return await _httpClient.GetFromJsonAsync<SubmitterStatsApiResponse>("api/me/stats");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get my stats");
+            return null;
+        }
+    }
+
+    public async Task<IReadOnlyList<FolderSummaryDto>?> GetMyFoldersAsync()
+    {
+        try
+        {
+            return await _httpClient.GetFromJsonAsync<FolderSummaryDto[]>("api/folders/mine");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get my folders");
+            return null;
+        }
+    }
+
+    public async Task<SearchTweetsApiResponse?> GetMyTweetsAsync(int page = 1, int pageSize = 50)
+    {
+        try
+        {
+            return await _httpClient.GetFromJsonAsync<SearchTweetsApiResponse>(
+                $"api/me/tweets?sort=date&page={page}&pageSize={pageSize}");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get my tweets");
+            return null;
         }
     }
 }

@@ -3,44 +3,40 @@
 
 <PageTitle>Search</PageTitle>
 
-<div class="mox-container-narrow" style="padding-top: 32px; padding-bottom: 64px;">
+<div class="mox-container-narrow" style="padding-top: 28px; padding-bottom: 64px;">
     <!-- Search bar -->
     <div class="search-bar">
         <i class="bi bi-search" style="color: var(--mox-muted-light); font-size: 16px; flex-shrink: 0;"></i>
         <input type="text"
                class="search-input"
-               placeholder="Search archived tweets..."
+               placeholder="Search tweets, users, tags..."
                @bind="_query"
                @onkeydown="HandleSearchKeyDown" />
-        <button class="mox-btn-primary" style="flex-shrink: 0; padding: 8px 20px; font-size: 14px;" @onclick="ExecuteSearch">
+        <button class="mox-btn-primary" style="flex-shrink: 0; padding: 8px 22px; font-size: 14px;" @onclick="ExecuteSearch">
             Search
         </button>
     </div>
 
     <!-- Filters -->
     <div class="filter-row">
+        <select class="mox-input" style="width: auto; padding: 8px 12px; font-size: 13px;">
+            <option>All tags</option>
+        </select>
         <input type="text"
                class="mox-input"
-               placeholder="Filter by tag..."
-               style="width: 160px; padding: 6px 12px; font-size: 13px;"
-               @bind="_tag" />
-        <input type="text"
-               class="mox-input"
-               placeholder="Filter by username..."
-               style="width: 180px; padding: 6px 12px; font-size: 13px;"
+               placeholder="@@username"
+               style="width: 140px; padding: 8px 12px; font-size: 13px;"
                @bind="_username" />
-        <select class="mox-input" style="width: auto; padding: 6px 12px; font-size: 13px;" @bind="_sort">
-            <option value="relevance">Most Relevant</option>
+        <select class="mox-input" style="width: auto; padding: 8px 12px; font-size: 13px;" @bind="_sort">
             <option value="votes">Most Voted</option>
             <option value="newest">Newest</option>
-            <option value="oldest">Oldest</option>
         </select>
         <div class="view-toggle">
-            <button class="toggle-btn @(_compactMode ? "" : "active")" @onclick="@(() => _compactMode = false)">
-                <i class="bi bi-list-ul"></i>
+            <button class="toggle-btn @(!_compactMode ? "active" : "")" @onclick="@(() => _compactMode = false)" title="Compact — faster scanning">
+                <i class="bi bi-list"></i> Compact
             </button>
-            <button class="toggle-btn @(_compactMode ? "active" : "")" @onclick="@(() => _compactMode = true)">
-                <i class="bi bi-grid-3x3-gap"></i>
+            <button class="toggle-btn @(_compactMode ? "active" : "")" @onclick="@(() => _compactMode = true)" title="Comfortable — full metadata">
+                <i class="bi bi-card-text"></i> Comfortable
             </button>
         </div>
     </div>
@@ -53,9 +49,8 @@
     {
         @if (!string.IsNullOrEmpty(_model.Query))
         {
-            <p style="font-size: 14px; color: var(--mox-muted); margin-bottom: 20px;">
-                <strong style="color: var(--mox-ink);">@_model.TotalCount</strong> results for
-                <strong>'@_model.Query'</strong>
+            <p style="font-size: 14px; color: var(--mox-muted); margin-bottom: 18px;">
+                <strong style="color: var(--mox-ink);">@_model.TotalCount results</strong> for "@_model.Query"
             </p>
         }
 
@@ -66,33 +61,64 @@
                     @GetInitial(_model.SubjectProfile.XUsername)
                 </div>
                 <div style="flex: 1;">
-                    <div style="font-weight: 700; font-size: 16px; color: var(--mox-ink);">
+                    <div style="font-weight: 700; font-size: 15px;">
                         @@@_model.SubjectProfile.XUsername
+                        @if (!string.IsNullOrEmpty(_model.SubjectProfile.DisplayName))
+                        {
+                            <span style="color: var(--mox-muted); font-weight: 400; font-size: 13.5px;"> &middot; @_model.SubjectProfile.DisplayName</span>
+                        }
                     </div>
-                    @if (!string.IsNullOrEmpty(_model.SubjectProfile.DisplayName))
-                    {
-                        <div style="font-size: 13px; color: var(--mox-muted);">
-                            @_model.SubjectProfile.DisplayName
-                        </div>
-                    }
                     @if (!string.IsNullOrEmpty(_model.SubjectProfile.Description))
                     {
-                        <p style="font-size: 14px; color: var(--mox-ink); margin: 6px 0 0;">
+                        <p style="font-size: 13.5px; color: var(--mox-muted); margin: 3px 0 0; line-height: 1.45;">
                             @_model.SubjectProfile.Description
                         </p>
                     }
                 </div>
-                <a href="/u/@_model.SubjectProfile.XUserId" style="font-size: 13px; color: var(--mox-accent); text-decoration: none; align-self: flex-start;">
-                    View profile <i class="bi bi-arrow-right"></i>
+                <a href="/u/@_model.SubjectProfile.XUserId" style="font-size: 13px; color: var(--mox-accent); font-weight: 600; text-decoration: none; flex-shrink: 0;">
+                    View profile →
                 </a>
+            </div>
+        }
+
+        @if (_model.FolderResults is not null && _model.FolderResults.Count > 0)
+        {
+            <div class="search-section-label">Folders</div>
+            <div class="search-folders-grid">
+                @foreach (var folder in _model.FolderResults)
+                {
+                    <a href="/browse/@folder.Id" class="search-folder-card">
+                        <div class="search-folder-icon">
+                            <i class="bi @folder.Icon"></i>
+                        </div>
+                        <div style="flex: 1; min-width: 0;">
+                            <div style="font-size: 15px; font-weight: 700;">@folder.Name</div>
+                            @if (!string.IsNullOrEmpty(folder.OwnerUsername))
+                            {
+                                <div style="display: flex; align-items: center; gap: 6px; margin-top: 4px;">
+                                    <span class="search-folder-owner-avatar">@folder.OwnerInitial</span>
+                                    <span style="font-size: 12px; color: #8a7f6e;">by <span style="color: var(--mox-accent); font-weight: 600;">@@@folder.OwnerUsername</span></span>
+                                </div>
+                            }
+                            <div style="font-size: 12px; color: var(--mox-muted-light); margin-top: 6px;">
+                                @folder.TweetCount tweets &middot; @folder.SubfolderCount subfolders
+                            </div>
+                        </div>
+                    </a>
+                }
             </div>
         }
 
         @if (_model.Results.Count > 0)
         {
+            @if (_model.FolderResults is not null && _model.FolderResults.Count > 0)
+            {
+                <div class="search-section-label">Tweets</div>
+            }
+
             @foreach (var tweet in _model.Results)
             {
-                <div style="margin-bottom: 16px;">
+                <div style="margin-bottom: 14px;">
                     <TweetCard Tweet="@tweet"
                                ShowScreenshot="true"
                                ShowCapture="true"
@@ -109,8 +135,8 @@
         else if (!string.IsNullOrEmpty(_model.Query) || !string.IsNullOrEmpty(_model.Tag) || !string.IsNullOrEmpty(_model.Username))
         {
             <EmptyState Icon="bi-search"
-                        Title="No results found"
-                        Description="Try adjusting your search terms or filters." />
+                        Title="No tweets match your search"
+                        Description="Try different keywords, or loosen the tag and author filters above." />
         }
     }
 </div>
@@ -121,7 +147,7 @@
     private string _query = "";
     private string _tag = "";
     private string _username = "";
-    private string _sort = "relevance";
+    private string _sort = "votes";
     private bool _compactMode;
     private int _page = 1;
     private const int PageSize = 20;

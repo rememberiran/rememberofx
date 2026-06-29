@@ -29,9 +29,19 @@ public record FolderViewModel(
     string? Description,
     string Icon,
     int SubfolderCount,
-    int TweetCount);
+    int TweetCount,
+    string Visibility = "private",
+    string? OwnerUsername = null,
+    string? OwnerInitial = null,
+    int Depth = 1,
+    DateTime? CreatedAt = null);
 
-public record SubfolderViewModel(Guid Id, string Name, int TweetCount);
+public record SubfolderViewModel(
+    Guid Id,
+    string Name,
+    int TweetCount,
+    string Visibility = "private",
+    int SubfolderCount = 0);
 
 public record BreadcrumbItemViewModel(string Label, string? Href);
 
@@ -60,4 +70,8 @@ public record MyFolderViewModel(
     string? Description,
     int TweetCount,
     int SubfolderCount,
-    string Created);
+    string Created,
+    string Visibility = "private",
+    bool IsNew = false);
+
+public record MoveTargetViewModel(Guid Id, string Label);

@@ -1,4 +1,4 @@
-using Application.Models;
+﻿using Application.Models;
 using Domain.Entities;
 
 namespace Api.Mappers;
@@ -8,6 +8,7 @@ public static class FolderDtoMapper
     public static FolderDto ToDto(
         Folder folder,
         int childCount,
+        int depth = 1,
         IReadOnlyList<FolderSummaryDto>? children = null,
         IReadOnlyList<FolderBreadcrumbDto>? breadcrumb = null)
     {
@@ -20,6 +21,9 @@ public static class FolderDtoMapper
             childCount,
             folder.CreatedAt,
             folder.IsActive,
+            folder.Visibility,
+            folder.CreatedByUser?.XUsername,
+            depth,
             children,
             breadcrumb);
     }
@@ -32,18 +36,10 @@ public static class FolderDtoMapper
             summary.Folder.Description,
             summary.Folder.Icon,
             summary.ActiveChildCount,
-            summary.TweetCount);
-    }
-
-    public static FolderSummaryDto ToSummaryDto(Folder folder, int activeChildCount, int tweetCount)
-    {
-        return new FolderSummaryDto(
-            folder.Id,
-            folder.Name,
-            folder.Description,
-            folder.Icon,
-            activeChildCount,
-            tweetCount);
+            summary.TweetCount,
+            summary.Folder.Visibility,
+            summary.Folder.CreatedByUser?.XUsername,
+            summary.Folder.CreatedAt);
     }
 
     public static FolderBreadcrumbDto ToBreadcrumbDto(Folder folder)

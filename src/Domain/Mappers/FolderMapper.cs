@@ -17,6 +17,7 @@ public static class FolderMapper
             CreatedByUserId = record.CreatedByUserId,
             CreatedAt = record.CreatedAt,
             IsActive = record.IsActive,
+            Visibility = record.Visibility,
             ParentFolder = record.ParentFolder is not null ? ToDomain(record.ParentFolder) : null,
             CreatedByUser = record.CreatedByUser is not null ? UserMapper.ToDomain(record.CreatedByUser) : null!,
             Children = record.Children.Select(ToDomain).ToList(),
@@ -36,6 +37,7 @@ public static class FolderMapper
             CreatedByUserId = entity.CreatedByUserId,
             CreatedAt = entity.CreatedAt,
             IsActive = entity.IsActive,
+            Visibility = entity.Visibility,
         };
     }
 }

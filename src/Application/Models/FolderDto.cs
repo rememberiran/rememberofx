@@ -9,6 +9,9 @@ public record FolderDto(
     int ChildCount,
     DateTime CreatedAt,
     bool IsActive,
+    string Visibility,
+    string? OwnerUsername,
+    int Depth,
     IReadOnlyList<FolderSummaryDto>? Children = null,
     IReadOnlyList<FolderBreadcrumbDto>? Breadcrumb = null);
 
@@ -18,7 +21,10 @@ public record FolderSummaryDto(
     string? Description,
     string? Icon,
     int ChildCount,
-    int TweetCount);
+    int TweetCount,
+    string Visibility,
+    string? OwnerUsername,
+    DateTime CreatedAt);
 
 public record FolderBreadcrumbDto(
     Guid Id,

@@ -1,0 +1,315 @@
+@rendermode InteractiveServer
+
+<div class="manage-backdrop" @onclick="HandleClose">
+    <div class="manage-panel" @onclick:stopPropagation>
+        @if (_loading)
+        {
+            <div style="padding: 40px; text-align: center;">
+                <LoadingSkeleton Count="3" />
+            </div>
+        }
+        else if (_folder is not null)
+        {
+            <!-- Header -->
+            <div class="manage-header">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div class="manage-icon-tile">
+                        <i class="bi bi-folder-fill"></i>
+                    </div>
+                    <div>
+                        <div class="manage-path-label">@_pathLabel</div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <h3 style="font-size: 17px; font-weight: 700; margin: 1px 0 0; line-height: 1.1;">@_folder.Name</h3>
+                            <span class="manage-level-badge">Level @_depth of @MaxDepth</span>
+                        </div>
+                    </div>
+                </div>
+                <button class="manage-close-btn" @onclick="HandleClose">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+
+            <!-- Body (scrollable) -->
+            <div class="manage-body">
+                <!-- Rename -->
+                <label class="manage-label">Folder name</label>
+                <div style="display: flex; gap: 9px; margin-bottom: 24px;">
+                    <input type="text" class="mox-input" style="flex: 1;" @bind="_renameValue" />
+                    <button class="mox-btn-secondary" @onclick="SaveRename">Save</button>
+                </div>
+
+                <!-- Visibility -->
+                <label class="manage-label">Visibility</label>
+                <div style="display: flex; gap: 10px; margin-bottom: 24px;">
+                    <button class="vis-card @(_visibility == "private" ? "vis-card-active" : "")" @onclick='@(() => SetVisibility("private"))'>
+                        <i class="bi bi-lock-fill" style="font-size: 16px; margin-top: 1px;"></i>
+                        <span>
+                            <span style="display: block; font-size: 14px; font-weight: 700; color: var(--mox-ink);">Private</span>
+                            <span style="display: block; font-size: 12px; color: #8a7f6d; line-height: 1.4; margin-top: 2px;">Only you can see and open this folder.</span>
+                        </span>
+                    </button>
+                    <button class="vis-card @(_visibility == "public" ? "vis-card-active" : "")" @onclick='@(() => SetVisibility("public"))'>
+                        <i class="bi bi-globe2" style="font-size: 16px; margin-top: 1px;"></i>
+                        <span>
+                            <span style="display: block; font-size: 14px; font-weight: 700; color: var(--mox-ink);">Public</span>
+                            <span style="display: block; font-size: 12px; color: #8a7f6d; line-height: 1.4; margin-top: 2px;">Anyone can browse this folder and its tweets.</span>
+                        </span>
+                    </button>
+                </div>
+
+                <!-- Subfolders -->
+                <div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px;">
+                    <label class="manage-label" style="margin-bottom: 0;">Subfolders</label>
+                    <span style="font-size: 12.5px; color: var(--mox-muted-light); font-weight: 600;">@_subfolders.Count subfolder@(_subfolders.Count == 1 ? "" : "s")</span>
+                </div>
+
+                @if (_depth < MaxDepth)
+                {
+                    <div style="display: flex; gap: 9px; margin-bottom: 16px;">
+                        <div style="flex: 1; display: flex; align-items: center; background: #fff; border: 1px solid var(--mox-border-input); border-radius: var(--mox-radius-card); padding: 0 12px;">
+                            <i class="bi bi-folder-plus" style="color: var(--mox-muted-light);"></i>
+                            <input type="text" placeholder="New subfolder name..." class="mox-input" style="flex: 1; border: none; background: transparent;" @bind="_newSubfolderName" />
+                        </div>
+                        <button class="mox-btn-primary" disabled="@(string.IsNullOrWhiteSpace(_newSubfolderName))" @onclick="AddSubfolder">Add</button>
+                    </div>
+                }
+                else
+                {
+                    <div class="depth-limit-hint">
+                        <i class="bi bi-info-circle-fill" style="margin-top: 1px;"></i>
+                        This folder is at level @MaxDepth — the deepest allowed. Move it up a level to add subfolders.
+                    </div>
+                }
+
+                @if (_subfolders.Count > 0)
+                {
+                    <div style="display: flex; flex-direction: column; gap: 9px;">
+                        @foreach (var sub in _subfolders)
+                        {
+                            <div class="subfolder-row">
+                                <i class="bi bi-folder" style="color: var(--mox-accent); font-size: 15px; flex-shrink: 0;"></i>
+
+                                @if (_editingSubId == sub.Id)
+                                {
+                                    <input type="text" class="mox-input" style="flex: 1; min-width: 0; border-color: var(--mox-accent);" @bind="_editingSubValue"
+                                           @onkeydown="@(e => HandleSubEditKey(e, sub.Id))" />
+                                    <button class="subfolder-action-btn subfolder-save-btn" title="Save" @onclick="@(() => SaveSubRename(sub.Id))">
+                                        <i class="bi bi-check-lg"></i>
+                                    </button>
+                                    <button class="subfolder-action-btn" title="Cancel" @onclick="CancelSubEdit">
+                                        <i class="bi bi-x-lg"></i>
+                                    </button>
+                                }
+                                else
+                                {
+                                    <a href="/browse/@sub.Id" style="flex: 1; min-width: 0; text-decoration: none;">
+                                        <div style="display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; color: var(--mox-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                            @sub.Name
+                                            <i class="bi @(sub.Visibility == "public" ? "bi-globe2" : "bi-lock-fill")" style="color: var(--mox-faint); font-size: 10px;"></i>
+                                        </div>
+                                        <div style="font-size: 12px; color: var(--mox-muted-light); margin-top: 1px;">
+                                            @sub.TweetCount tweets &middot; @sub.ChildCount sub
+                                        </div>
+                                    </a>
+
+                                    @if (_moveTargets is not null)
+                                    {
+                                        <select class="mox-input" style="flex-shrink: 0; max-width: 150px; padding: 7px 9px; font-size: 12.5px;"
+                                                @onchange="@(e => HandleMove(sub.Id, e))">
+                                            <option value="">Move to…</option>
+                                            <option value="__root__">Top level (My Archive)</option>
+                                            @foreach (var target in _moveTargets)
+                                            {
+                                                <option value="@target.Id">@target.Name</option>
+                                            }
+                                        </select>
+                                    }
+
+                                    <button class="subfolder-action-btn" title="Rename" @onclick="@(() => StartSubEdit(sub))">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <button class="subfolder-action-btn subfolder-delete-btn" title="Delete subfolder" @onclick="@(() => DeleteSubfolder(sub.Id))">
+                                        <i class="bi bi-trash3"></i>
+                                    </button>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div style="background: #f5efe3; border: 1px dashed #cdbfa8; border-radius: 10px; padding: 26px 18px; text-align: center; color: var(--mox-muted-light); font-size: 13.5px; line-height: 1.5;">
+                        No subfolders yet.<br />Add one above to start nesting captures.
+                    </div>
+                }
+            </div>
+
+            <!-- Footer -->
+            <div class="manage-footer">
+                <button class="mox-btn-primary" style="background: var(--mox-ink);" @onclick="HandleClose">Done</button>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private const int MaxDepth = 5;
+
+    [Parameter]
+    public Guid FolderId { get; set; }
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    [Parameter]
+    public EventCallback OnFolderUpdated { get; set; }
+
+    [Inject]
+    private ApiClient ApiClient { get; set; } = default!;
+
+    private Application.Models.FolderDto? _folder;
+    private bool _loading = true;
+    private string _renameValue = "";
+    private string _visibility = "private";
+    private string _newSubfolderName = "";
+    private int _depth = 1;
+    private string _pathLabel = "";
+    private Guid? _editingSubId;
+    private string _editingSubValue = "";
+    private List<SubfolderInfo> _subfolders = new();
+    private List<Application.Models.FolderSummaryDto>? _moveTargets;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadFolder();
+    }
+
+    private async Task LoadFolder()
+    {
+        _loading = true;
+        _folder = await ApiClient.GetFolderAsync(FolderId);
+
+        if (_folder is not null)
+        {
+            _renameValue = _folder.Name;
+            _visibility = _folder.Visibility;
+            _depth = _folder.Depth;
+            _pathLabel = BuildPathLabel(_folder);
+            _subfolders = (_folder.Children ?? [])
+                .Select(c => new SubfolderInfo(c.Id, c.Name, c.TweetCount, c.Visibility, c.ChildCount))
+                .ToList();
+
+            var targets = await ApiClient.GetMoveTargetsAsync(FolderId);
+            _moveTargets = targets?.ToList();
+        }
+
+        _loading = false;
+    }
+
+    private static string BuildPathLabel(Application.Models.FolderDto folder)
+    {
+        if (folder.Breadcrumb is null || folder.Breadcrumb.Count == 0)
+        {
+            return folder.Name;
+        }
+
+        var parts = folder.Breadcrumb.Select(b => b.Name).Append(folder.Name);
+        return string.Join(" / ", parts);
+    }
+
+    private async Task SaveRename()
+    {
+        if (string.IsNullOrWhiteSpace(_renameValue) || _renameValue == _folder?.Name)
+        {
+            return;
+        }
+
+        await ApiClient.UpdateFolderAsync(FolderId, _renameValue.Trim(), null, null, null, null);
+        await OnFolderUpdated.InvokeAsync();
+    }
+
+    private async Task SetVisibility(string vis)
+    {
+        if (vis == _visibility)
+        {
+            return;
+        }
+
+        _visibility = vis;
+        await ApiClient.UpdateFolderAsync(FolderId, null, null, null, vis, null);
+        await LoadFolder();
+    }
+
+    private async Task AddSubfolder()
+    {
+        if (string.IsNullOrWhiteSpace(_newSubfolderName))
+        {
+            return;
+        }
+
+        await ApiClient.CreateFolderAsync(_newSubfolderName.Trim(), null, FolderId, _visibility);
+        _newSubfolderName = "";
+        await LoadFolder();
+    }
+
+    private void StartSubEdit(SubfolderInfo sub)
+    {
+        _editingSubId = sub.Id;
+        _editingSubValue = sub.Name;
+    }
+
+    private void CancelSubEdit()
+    {
+        _editingSubId = null;
+        _editingSubValue = "";
+    }
+
+    private async Task SaveSubRename(Guid subId)
+    {
+        if (!string.IsNullOrWhiteSpace(_editingSubValue))
+        {
+            await ApiClient.UpdateFolderAsync(subId, _editingSubValue.Trim(), null, null, null, null);
+        }
+
+        _editingSubId = null;
+        await LoadFolder();
+    }
+
+    private async Task HandleSubEditKey(KeyboardEventArgs e, Guid subId)
+    {
+        if (e.Key == "Enter")
+        {
+            await SaveSubRename(subId);
+        }
+        else if (e.Key == "Escape")
+        {
+            CancelSubEdit();
+        }
+    }
+
+    private async Task DeleteSubfolder(Guid subId)
+    {
+        await ApiClient.DeleteFolderAsync(subId);
+        await LoadFolder();
+    }
+
+    private async Task HandleMove(Guid subId, ChangeEventArgs e)
+    {
+        var targetValue = e.Value?.ToString();
+        if (string.IsNullOrEmpty(targetValue))
+        {
+            return;
+        }
+
+        Guid? parentId = targetValue == "__root__" ? null : Guid.Parse(targetValue);
+        await ApiClient.UpdateFolderAsync(subId, null, null, null, null, parentId);
+        await LoadFolder();
+    }
+
+    private async Task HandleClose()
+    {
+        await OnClose.InvokeAsync();
+    }
+
+    private record SubfolderInfo(Guid Id, string Name, int TweetCount, string Visibility, int ChildCount);
+}

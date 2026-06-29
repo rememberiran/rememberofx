@@ -10,6 +10,7 @@ public class Folder
     public Guid CreatedByUserId { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public bool IsActive { get; set; } = true;
+    public string Visibility { get; set; } = "private";
 
     public Folder? ParentFolder { get; set; }
     public User CreatedByUser { get; set; } = default!;

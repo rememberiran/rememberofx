@@ -1,18 +1,23 @@
-using Application.Interfaces;
+﻿using Application.Interfaces;
 using Application.Models;
 using Domain.Entities;
 using Domain.Mappers;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace Application.Services;
 
 public class TweetQueryService : ITweetQueryService
 {
-    private readonly IAppDbContext _db;
+    private static readonly EventId SubmitterStatsRetrievedEvent = new(1070, "SubmitterStatsRetrieved");
 
-    public TweetQueryService(IAppDbContext db)
+    private readonly IAppDbContext _db;
+    private readonly ILogger<TweetQueryService> _logger;
+
+    public TweetQueryService(IAppDbContext db, ILogger<TweetQueryService> logger)
     {
         _db = db;
+        _logger = logger;
     }
 
     public async Task<Result<TweetWithAuthor>> GetByIdAsync(Guid id, CancellationToken ct)
@@ -45,5 +50,39 @@ public class TweetQueryService : ITweetQueryService
         }
 
         return Result.Success(TweetMapper.ToDomain(tweet));
+    }
+
+    public async Task<Result<SubmitterStatsDto>> GetSubmitterStatsAsync(Guid userId, CancellationToken ct)
+    {
+        var tweetStats = await _db.Tweets.AsNoTracking()
+            .Where(t => t.SubmittedByUserId == userId)
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                SubmittedTweetCount = g.Count(),
+                TotalVotesEarned = g.Sum(t => t.VoteCount),
+                DeletedTweetsPreserved = g.Count(t => t.FetchStatus != "Ok"),
+            })
+            .FirstOrDefaultAsync(ct);
+
+        var folderCount = await _db.Folders.AsNoTracking()
+            .CountAsync(f => f.CreatedByUserId == userId && f.IsActive, ct);
+
+        var dto = new SubmitterStatsDto(
+            SubmittedTweetCount: tweetStats?.SubmittedTweetCount ?? 0,
+            TotalVotesEarned: tweetStats?.TotalVotesEarned ?? 0,
+            DeletedTweetsPreserved: tweetStats?.DeletedTweetsPreserved ?? 0,
+            CreatedFolderCount: folderCount);
+
+        _logger.LogInformation(
+            SubmitterStatsRetrievedEvent,
+            "Submitter stats retrieved for user {UserId}: {SubmittedCount} tweets, {VotesEarned} votes, {DeletedPreserved} deleted preserved, {FolderCount} folders",
+            userId,
+            dto.SubmittedTweetCount,
+            dto.TotalVotesEarned,
+            dto.DeletedTweetsPreserved,
+            dto.CreatedFolderCount);
+
+        return Result.Success(dto);
     }
 }

@@ -15,7 +15,9 @@ public record FolderDetailPageModel(
     int TotalTweetCount,
     int CurrentPage,
     int TotalPages,
-    string Sort);
+    string Sort,
+    int Depth = 1,
+    int MaxDepth = 5);
 
 public record TweetDetailPageModel(
     TweetViewModel Tweet,
@@ -32,7 +34,8 @@ public record SearchPageModel(
     string? Tag,
     string? Username,
     string Sort,
-    ProfileViewModel? SubjectProfile);
+    ProfileViewModel? SubjectProfile,
+    IReadOnlyList<FolderViewModel> FolderResults = null!);
 
 public record SubmitPageModel(
     IReadOnlyList<FolderOptionViewModel> AvailableFolders);

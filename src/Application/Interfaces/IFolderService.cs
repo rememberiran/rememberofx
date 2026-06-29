@@ -10,8 +10,12 @@ public interface IFolderService
     Task<Result<Folder>> GetByIdAsync(Guid id, CancellationToken ct);
     Task<Result<List<FolderSummary>>> GetChildrenAsync(Guid id, CancellationToken ct);
     Task<Result<PagedResult<TweetWithAuthor>>> GetTweetsAsync(Guid folderId, string sort, int page, int pageSize, CancellationToken ct);
-    Task<Result<Folder>> CreateAsync(string name, string? description, string? icon, Guid? parentFolderId, CancellationToken ct);
-    Task<Result<Folder>> UpdateAsync(Guid id, string? name, string? description, string? icon, Guid? parentFolderId, CancellationToken ct);
+    Task<Result<Folder>> CreateAsync(string name, string? description, string? icon, string? visibility, Guid? parentFolderId, CancellationToken ct);
+    Task<Result<Folder>> UpdateAsync(Guid id, string? name, string? description, string? icon, string? visibility, Guid? parentFolderId, CancellationToken ct);
+    Task<Result> DeleteAsync(Guid id, CancellationToken ct);
     Task<Result> AddTweetAsync(Guid folderId, Guid tweetId, CancellationToken ct);
     Task<Result> RemoveTweetAsync(Guid folderId, Guid tweetId, CancellationToken ct);
+    Task<Result<List<FolderSummary>>> SearchFoldersAsync(string query, CancellationToken ct);
+    Task<Result<List<FolderSummary>>> GetValidMoveTargetsAsync(Guid folderId, CancellationToken ct);
+    Task<Result<int>> GetDepthAsync(Guid folderId, CancellationToken ct);
 }

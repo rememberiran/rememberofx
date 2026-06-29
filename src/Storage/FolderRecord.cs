@@ -10,6 +10,7 @@ public class FolderRecord
     public Guid CreatedByUserId { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public bool IsActive { get; set; } = true;
+    public string Visibility { get; set; } = "private";
 
     public FolderRecord? ParentFolder { get; set; }
     public UserRecord CreatedByUser { get; set; } = default!;

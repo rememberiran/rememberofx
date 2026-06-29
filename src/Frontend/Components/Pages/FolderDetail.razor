@@ -18,39 +18,76 @@ else
 }
 else if (_model is not null)
 {
-    <div class="mox-container" style="padding-top: 32px;">
+    <div class="mox-container" style="padding-top: 32px; padding-bottom: 64px;">
         <Breadcrumbs Items="@_model.Breadcrumb.ToList()" />
 
         <div class="folder-header">
             <div>
-                <h1 style="font-family: var(--mox-font-serif); font-size: 30px; font-weight: 800; color: var(--mox-ink); margin: 0 0 8px;">
-                    @_model.Folder.Name
-                </h1>
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px; flex-wrap: wrap;">
+                    <h1 style="font-family: var(--mox-font-serif); font-size: 30px; font-weight: 800; color: var(--mox-ink); margin: 0;">
+                        @_model.Folder.Name
+                    </h1>
+                    <span class="detail-badge">
+                        <i class="bi @(_model.Folder.Visibility == "public" ? "bi-globe2" : "bi-lock-fill")" style="font-size: 11px;"></i>
+                        @(_model.Folder.Visibility == "public" ? "Public" : "Private")
+                    </span>
+                    <span class="detail-badge" style="border: 1px solid var(--mox-border-card); background: transparent;">
+                        <i class="bi bi-diagram-3" style="font-size: 11px;"></i>
+                        Level @_model.Depth of @_model.MaxDepth
+                    </span>
+                </div>
                 @if (!string.IsNullOrEmpty(_model.Folder.Description))
                 {
-                    <p style="color: var(--mox-muted); font-size: 15px; margin: 0;">
+                    <p style="color: var(--mox-muted); font-size: 15px; line-height: 1.55; margin: 0; max-width: 680px;">
                         @_model.Folder.Description
                     </p>
                 }
             </div>
-            <button class="mox-btn-secondary" style="display: inline-flex; align-items: center; gap: 6px;">
-                <i class="bi bi-pencil"></i> Edit
+            <button class="manage-pencil-btn" @onclick="OpenManagePanel" title="Manage folder">
+                <i class="bi bi-pencil"></i>
             </button>
         </div>
 
-        @if (_model.Subfolders.Count > 0)
-        {
-            <div class="subfolders-row">
-                @foreach (var sub in _model.Subfolders)
-                {
-                    <a href="/browse/@sub.Id" class="subfolder-card">
-                        <i class="bi bi-folder" style="color: var(--mox-accent); font-size: 16px;"></i>
-                        <span class="subfolder-name">@sub.Name</span>
-                        <span class="subfolder-count">@sub.TweetCount tweets</span>
-                    </a>
-                }
+        <!-- Subfolders section -->
+        <div class="subfolders-section">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                <span class="section-label">Subfolders</span>
+                <button class="manage-link" @onclick="OpenManagePanel">
+                    <i class="bi bi-sliders2"></i> Manage
+                </button>
             </div>
-        }
+            @if (_model.Subfolders.Count > 0)
+            {
+                <div class="subfolders-row">
+                    @foreach (var sub in _model.Subfolders)
+                    {
+                        <a href="/browse/@sub.Id" class="subfolder-card">
+                            <div style="display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px;">
+                                <i class="bi bi-folder" style="color: var(--mox-accent);"></i>
+                                @sub.Name
+                                <i class="bi @(sub.Visibility == "public" ? "bi-globe2" : "bi-lock-fill")" style="color: var(--mox-faint); font-size: 11px; margin-left: auto;"></i>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 10px; color: var(--mox-muted-light); font-size: 12px; margin-top: 6px;">
+                                <span>@sub.TweetCount tweets</span>
+                                @if (sub.SubfolderCount > 0)
+                                {
+                                    <span style="display: inline-flex; align-items: center; gap: 3px;">
+                                        <i class="bi bi-diagram-2" style="font-size: 10px;"></i> @sub.SubfolderCount sub
+                                    </span>
+                                }
+                            </div>
+                        </a>
+                    }
+                </div>
+            }
+            else
+            {
+                <div style="display: flex; align-items: center; gap: 8px; color: var(--mox-muted-light); font-size: 13.5px; padding: 4px 0;">
+                    <i class="bi bi-folder2"></i> No subfolders here &mdash; add one from
+                    <button class="manage-link" style="padding: 0;" @onclick="OpenManagePanel">Manage</button>.
+                </div>
+            }
+        </div>
 
         <div class="tweet-list-header">
             <span style="font-weight: 600; color: var(--mox-ink);">
@@ -62,7 +99,7 @@ else if (_model is not null)
                     <option value="newest">Newest</option>
                     <option value="oldest">Oldest</option>
                 </select>
-                <a href="/submit" class="mox-btn-primary" style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; padding: 6px 14px;">
+                <a href="/submit" class="mox-btn-primary" style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; padding: 6px 14px; text-decoration: none;">
                     <i class="bi bi-plus-lg"></i> Add Tweet
                 </a>
             </div>
@@ -87,11 +124,22 @@ else if (_model is not null)
         }
         else
         {
-            <EmptyState Icon="bi-chat-square-text"
-                        Title="No tweets in this folder"
-                        Description="Add tweets to this folder to start building your collection." />
+            <EmptyState Icon="bi-folder2-open"
+                        Title="No tweets in this folder yet"
+                        Description="Archive a tweet here before it disappears from X.">
+                <a href="/submit" class="mox-btn-primary" style="text-decoration: none;">
+                    <i class="bi bi-plus-lg"></i> Add a Tweet
+                </a>
+            </EmptyState>
         }
     </div>
+
+    @if (_showManagePanel)
+    {
+        <ManageFolderPanel FolderId="@FolderId"
+                           OnClose="CloseManagePanel"
+                           OnFolderUpdated="OnFolderUpdated" />
+    }
 }
 
 @code {
@@ -99,6 +147,7 @@ else if (_model is not null)
     private bool _loading = true;
     private string _sort = "votes";
     private int _page = 1;
+    private bool _showManagePanel;
     private const int PageSize = 20;
 
     [Parameter]
@@ -142,5 +191,21 @@ else if (_model is not null)
     private async Task HandleVote(Guid tweetId)
     {
         await Task.CompletedTask;
+    }
+
+    private void OpenManagePanel()
+    {
+        _showManagePanel = true;
+    }
+
+    private void CloseManagePanel()
+    {
+        _showManagePanel = false;
+    }
+
+    private async Task OnFolderUpdated()
+    {
+        _showManagePanel = false;
+        await LoadData();
     }
 }

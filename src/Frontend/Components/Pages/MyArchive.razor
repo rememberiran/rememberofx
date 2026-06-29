@@ -14,19 +14,21 @@
     {
         <!-- Header card -->
         <div class="archive-header-card">
-            <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 20px;">
+            <div style="display: flex; align-items: center; gap: 18px; flex-wrap: wrap;">
                 <div class="archive-avatar">
                     <i class="bi bi-person-fill" style="font-size: 28px;"></i>
                 </div>
-                <div style="flex: 1;">
-                    <h1 style="font-family: var(--mox-font-serif); font-size: 24px; font-weight: 800; color: var(--mox-ink); margin: 0 0 4px;">
-                        My Archive
-                    </h1>
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <span class="mox-chip" style="font-size: 11px;">Contributor</span>
+                <div style="flex: 1; min-width: 200px;">
+                    <div style="display: flex; align-items: center; gap: 9px; flex-wrap: wrap;">
+                        <h1 style="font-family: var(--mox-font-serif); font-size: 26px; font-weight: 800; color: var(--mox-ink); margin: 0;">
+                            My Archive
+                        </h1>
+                        <span class="contributor-badge">
+                            <i class="bi bi-patch-check-fill" style="color: var(--mox-success-text);"></i> Contributor
+                        </span>
                     </div>
                 </div>
-                <a href="/submit" class="mox-btn-primary" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none;">
+                <a href="/submit" class="mox-btn-primary" style="flex-shrink: 0; display: inline-flex; align-items: center; gap: 7px; text-decoration: none;">
                     <i class="bi bi-plus-lg"></i> Submit a Tweet
                 </a>
             </div>
@@ -54,10 +56,10 @@
         <!-- Tab toggle -->
         <div class="tab-toggle">
             <button class="tab-btn @(_activeTab == Tab.Tweets ? "active" : "")" @onclick="@(() => _activeTab = Tab.Tweets)">
-                <i class="bi bi-chat-square-text"></i> Tweets
+                <i class="bi bi-chat-square-text"></i> Tweets <span class="tab-count">@_model.SubmittedTweets.Count</span>
             </button>
             <button class="tab-btn @(_activeTab == Tab.Folders ? "active" : "")" @onclick="@(() => _activeTab = Tab.Folders)">
-                <i class="bi bi-folder"></i> Folders
+                <i class="bi bi-folder-fill"></i> Folders <span class="tab-count">@_model.CreatedFolders.Count</span>
             </button>
         </div>
 
@@ -70,8 +72,8 @@
                     <div style="margin-bottom: 16px;">
                         @if (!string.IsNullOrEmpty(tweet.SubmittedDate))
                         {
-                            <p style="font-size: 12px; color: var(--mox-muted); margin: 0 0 6px;">
-                                <i class="bi bi-person-check"></i> Submitted by you · @tweet.SubmittedDate
+                            <p style="font-size: 12px; color: var(--mox-muted); margin: 0 0 6px; display: flex; align-items: center; gap: 5px;">
+                                <i class="bi bi-archive" style="font-size: 11px;"></i> Submitted by you &middot; @tweet.SubmittedDate
                             </p>
                         }
                         <TweetCard Tweet="@tweet"
@@ -86,9 +88,11 @@
             else
             {
                 <EmptyState Icon="bi-chat-square-text"
-                            Title="No tweets submitted yet"
-                            Description="Submit your first tweet to start building your archive.">
-                    <a href="/submit" class="mox-btn-primary" style="text-decoration: none;">Submit a Tweet</a>
+                            Title="You haven't submitted any tweets yet"
+                            Description="Archive a tweet before it disappears from X — your captures will be collected here.">
+                    <a href="/submit" class="mox-btn-primary" style="text-decoration: none;">
+                        <i class="bi bi-plus-lg"></i> Submit a Tweet
+                    </a>
                 </EmptyState>
             }
         }
@@ -96,12 +100,15 @@
         {
             <!-- Create folder row -->
             <div class="create-folder-row">
-                <input type="text"
-                       class="mox-input"
-                       placeholder="New folder name..."
-                       style="flex: 1;"
-                       @bind="_newFolderName" />
-                <button class="mox-btn-secondary"
+                <div style="flex: 1; display: flex; align-items: center; background: var(--mox-surface); border: 1px solid var(--mox-border-input); border-radius: var(--mox-radius-card); padding: 0 13px;">
+                    <i class="bi bi-folder-plus" style="color: var(--mox-muted-light);"></i>
+                    <input type="text"
+                           class="mox-input"
+                           placeholder="Name a new folder..."
+                           style="flex: 1; border: none; background: transparent;"
+                           @bind="_newFolderName" />
+                </div>
+                <button class="mox-btn-primary"
                         disabled="@(string.IsNullOrWhiteSpace(_newFolderName))"
                         @onclick="CreateFolder">
                     Create folder
@@ -114,28 +121,41 @@
                     @foreach (var folder in _model.CreatedFolders)
                     {
                         <div class="my-folder-card">
-                            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
-                                <a href="/browse/@folder.Id" style="text-decoration: none;">
-                                    <h3 style="font-family: var(--mox-font-serif); font-size: 16px; font-weight: 700; color: var(--mox-ink); margin: 0;">
-                                        @folder.Name
-                                    </h3>
-                                </a>
-                                <button class="action-btn">
+                            <div style="display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 12px;">
+                                <div class="my-folder-icon-tile">
+                                    <i class="bi bi-folder-fill" style="color: var(--mox-accent); font-size: 20px;"></i>
+                                </div>
+                                <button class="action-btn" @onclick="@(() => OpenManagePanel(folder.Id))" @onclick:stopPropagation title="Manage folder">
                                     <i class="bi bi-pencil"></i>
                                 </button>
                             </div>
+                            <div style="display: flex; align-items: center; gap: 7px; margin-bottom: 5px;">
+                                <a href="/browse/@folder.Id" style="font-size: 17px; font-weight: 700; color: var(--mox-ink); text-decoration: none;">
+                                    @folder.Name
+                                </a>
+                                <span class="vis-badge-small">
+                                    <i class="bi @(folder.Visibility == "public" ? "bi-globe2" : "bi-lock-fill")" style="font-size: 9px;"></i>
+                                    @(folder.Visibility == "public" ? "Public" : "Private")
+                                </span>
+                                @if (folder.IsNew)
+                                {
+                                    <span class="new-badge">NEW</span>
+                                }
+                            </div>
                             @if (!string.IsNullOrEmpty(folder.Description))
                             {
-                                <p style="font-size: 13px; color: var(--mox-muted); margin: 0 0 12px; line-height: 1.4;">
+                                <p style="color: var(--mox-muted); font-size: 13.5px; line-height: 1.45; margin: 0 0 14px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 38px;">
                                     @folder.Description
                                 </p>
                             }
-                            <div style="display: flex; gap: 14px; font-size: 12px; color: var(--mox-muted-light);">
-                                <span><i class="bi bi-chat-square-text"></i> @folder.TweetCount tweets</span>
-                                <span><i class="bi bi-folder"></i> @folder.SubfolderCount subfolders</span>
-                            </div>
-                            <div style="font-size: 11px; color: var(--mox-muted-light); margin-top: 8px;">
-                                Created @folder.Created
+                            <div class="my-folder-footer">
+                                <span style="display: inline-flex; align-items: center; gap: 5px;">
+                                    <i class="bi bi-chat-square-text" style="color: var(--mox-faint);"></i> @folder.TweetCount
+                                </span>
+                                <span style="display: inline-flex; align-items: center; gap: 5px;">
+                                    <i class="bi bi-folder2" style="color: var(--mox-faint);"></i> @folder.SubfolderCount sub
+                                </span>
+                                <span style="margin-left: auto; color: var(--mox-muted-light); font-weight: 500;">@folder.Created</span>
                             </div>
                         </div>
                     }
@@ -144,8 +164,8 @@
             else
             {
                 <EmptyState Icon="bi-folder2-open"
-                            Title="No folders created yet"
-                            Description="Create a folder to organize archived tweets." />
+                            Title="No folders yet"
+                            Description="Name a folder in the field above to start organizing your captures." />
             }
         }
     }
@@ -153,25 +173,36 @@
     {
         <!-- Not signed in state -->
         <div class="gate-card">
-            <i class="bi bi-person-lock" style="font-size: 48px; color: var(--mox-muted-light);"></i>
-            <h2 style="font-family: var(--mox-font-serif); font-size: 22px; font-weight: 700; color: var(--mox-ink); margin: 16px 0 8px;">
+            <div style="width: 60px; height: 60px; border-radius: 50%; background: var(--mox-chip-bg); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px;">
+                <i class="bi bi-person-lock" style="font-size: 26px; color: var(--mox-faint);"></i>
+            </div>
+            <h2 style="font-family: var(--mox-font-serif); font-size: 18px; font-weight: 700; color: var(--mox-ink); margin: 0 0 6px;">
                 Sign in to see your archive
             </h2>
-            <p style="font-size: 14px; color: var(--mox-muted); margin: 0 0 24px;">
-                Connect your X account to view your submissions and folders.
+            <p style="font-size: 14px; color: var(--mox-muted); margin: 0 0 18px; max-width: 360px; line-height: 1.5;">
+                Your submitted tweets and the folders you've created live here, tied to your X account.
             </p>
-            <button class="mox-btn-primary" style="display: inline-flex; align-items: center; gap: 8px; padding: 12px 28px;">
+            <button class="mox-btn-primary" style="display: inline-flex; align-items: center; gap: 8px;">
                 <i class="bi bi-twitter-x"></i> Sign in with X
             </button>
         </div>
     }
 </div>
 
+@if (_showManagePanel && _manageFolderId.HasValue)
+{
+    <ManageFolderPanel FolderId="@_manageFolderId.Value"
+                       OnClose="CloseManagePanel"
+                       OnFolderUpdated="OnFolderUpdated" />
+}
+
 @code {
     private MyArchivePageModel? _model;
     private bool _loading = true;
     private Tab _activeTab = Tab.Tweets;
     private string _newFolderName = "";
+    private bool _showManagePanel;
+    private Guid? _manageFolderId;
 
     private readonly List<BreadcrumbItemViewModel> _breadcrumb = new()
     {
@@ -181,6 +212,9 @@
 
     [Inject]
     private MyArchiveOrchestrator Orchestrator { get; set; } = default!;
+
+    [Inject]
+    private ApiClient ApiClient { get; set; } = default!;
 
     protected override async Task OnInitializedAsync()
     {
@@ -200,8 +234,32 @@
             return;
         }
 
+        var result = await ApiClient.CreateFolderAsync(_newFolderName.Trim(), null, null, "private");
         _newFolderName = "";
-        await Task.CompletedTask;
+
+        if (result is not null)
+        {
+            _model = await Orchestrator.GetAsync();
+        }
+    }
+
+    private void OpenManagePanel(Guid folderId)
+    {
+        _manageFolderId = folderId;
+        _showManagePanel = true;
+    }
+
+    private void CloseManagePanel()
+    {
+        _showManagePanel = false;
+        _manageFolderId = null;
+    }
+
+    private async Task OnFolderUpdated()
+    {
+        _showManagePanel = false;
+        _manageFolderId = null;
+        _model = await Orchestrator.GetAsync();
     }
 
     private enum Tab

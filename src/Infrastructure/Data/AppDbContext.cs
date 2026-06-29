@@ -66,6 +66,7 @@ public class AppDbContext : DbContext, IAppDbContext
             e.Property(f => f.Name).HasMaxLength(200);
             e.Property(f => f.Description).HasMaxLength(1000);
             e.Property(f => f.Icon).HasMaxLength(50);
+            e.Property(f => f.Visibility).HasMaxLength(10).HasDefaultValue("private");
             e.HasOne(f => f.ParentFolder)
              .WithMany(f => f.Children)
              .HasForeignKey(f => f.ParentFolderId)

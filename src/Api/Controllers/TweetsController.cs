@@ -1,4 +1,4 @@
-using Api.Extensions;
+﻿using Api.Extensions;
 using Api.Mappers;
 using Api.Models.Requests;
 using Api.Models.Responses;

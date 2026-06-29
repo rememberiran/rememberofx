@@ -95,7 +95,10 @@ public class FoldersController : ControllerBase
             current = current.ParentFolder;
         }
 
-        var dto = FolderDtoMapper.ToDto(folder, activeChildren.Count, children, breadcrumb);
+        var depthResult = await _folderService.GetDepthAsync(id, ct);
+        var depth = depthResult.IsSuccess ? depthResult.Value : breadcrumb.Count + 1;
+
+        var dto = FolderDtoMapper.ToDto(folder, activeChildren.Count, depth, children, breadcrumb);
         return Ok(dto);
     }
 
@@ -164,7 +167,7 @@ public class FoldersController : ControllerBase
         }
 
         var result = await _folderService.CreateAsync(
-            request.Name, request.Description, request.Icon, request.ParentFolderId, ct);
+            request.Name, request.Description, request.Icon, request.Visibility, request.ParentFolderId, ct);
 
         if (!result.IsSuccess)
         {
@@ -182,7 +185,7 @@ public class FoldersController : ControllerBase
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateFolderRequest request, CancellationToken ct)
     {
-        var result = await _folderService.UpdateAsync(id, request.Name, request.Description, request.Icon, request.ParentFolderId, ct);
+        var result = await _folderService.UpdateAsync(id, request.Name, request.Description, request.Icon, request.Visibility, request.ParentFolderId, ct);
 
         if (!result.IsSuccess)
         {
@@ -191,6 +194,52 @@ public class FoldersController : ControllerBase
 
         var dto = FolderDtoMapper.ToDto(result.Value!, 0);
         return Ok(dto);
+    }
+
+    [HttpDelete("{id:guid}")]
+    [Authorize(Roles = "Contributor,Admin")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
+    {
+        var result = await _folderService.DeleteAsync(id, ct);
+        return result.IsSuccess ? NoContent() : result.ToActionResult();
+    }
+
+    [HttpGet("search")]
+    [ProducesResponseType(typeof(List<FolderSummaryDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> Search([FromQuery] string q, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(q))
+        {
+            return Ok(Array.Empty<FolderSummaryDto>());
+        }
+
+        var result = await _folderService.SearchFoldersAsync(q, ct);
+        if (!result.IsSuccess)
+        {
+            return result.ToActionResult();
+        }
+
+        var dtos = result.Value!.Select(FolderDtoMapper.ToSummaryDto).ToList();
+        return Ok(dtos);
+    }
+
+    [HttpGet("{id:guid}/move-targets")]
+    [Authorize(Roles = "Contributor,Admin")]
+    [ProducesResponseType(typeof(List<FolderSummaryDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetMoveTargets(Guid id, CancellationToken ct)
+    {
+        var result = await _folderService.GetValidMoveTargetsAsync(id, ct);
+        if (!result.IsSuccess)
+        {
+            return result.ToActionResult();
+        }
+
+        var dtos = result.Value!.Select(FolderDtoMapper.ToSummaryDto).ToList();
+        return Ok(dtos);
     }
 
     [HttpPost("{folderId:guid}/tweets/{tweetId:guid}")]

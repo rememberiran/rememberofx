@@ -20,7 +20,17 @@ internal static class ModelMappers
         FolderIcons.TryGetValue(name, out var icon) ? icon : "bi-folder-fill";
 
     public static FolderViewModel ToFolderViewModel(FolderSummaryDto dto) =>
-        new(dto.Id, dto.Name, dto.Description, dto.Icon ?? GetFolderIcon(dto.Name), dto.ChildCount, dto.TweetCount);
+        new(
+            dto.Id,
+            dto.Name,
+            dto.Description,
+            dto.Icon ?? GetFolderIcon(dto.Name),
+            dto.ChildCount,
+            dto.TweetCount,
+            dto.Visibility,
+            dto.OwnerUsername,
+            string.IsNullOrEmpty(dto.OwnerUsername) ? null : dto.OwnerUsername[..1].ToUpperInvariant(),
+            CreatedAt: dto.CreatedAt);
 
     public static TweetViewModel ToTweetViewModel(TweetDto dto) =>
         new(
@@ -61,4 +71,15 @@ internal static class ModelMappers
             tweetCount,
             totalVotes,
             null);
+
+    public static MyFolderViewModel ToMyFolderViewModel(FolderSummaryDto dto) =>
+        new(
+            dto.Id,
+            dto.Name,
+            dto.Description,
+            dto.TweetCount,
+            dto.ChildCount,
+            dto.CreatedAt != default ? dto.CreatedAt.ToString("MMM yyyy", CultureInfo.InvariantCulture) : "",
+            dto.Visibility,
+            dto.CreatedAt > DateTime.UtcNow.AddDays(-1));
 }

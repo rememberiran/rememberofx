@@ -1,4 +1,4 @@
-namespace Ingestion.Twitter;
+﻿namespace Ingestion.Twitter;
 
 public interface ITweetScraper : IAsyncDisposable
 {
