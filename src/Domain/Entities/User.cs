@@ -9,6 +9,9 @@ public class User
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public Guid? CreatedByUserId { get; set; }
+    public DateTime? SuspendedAt { get; set; }
+    public string? SuspendedReason { get; set; }
+    public Guid? SuspendedByUserId { get; set; }
 
     public User? CreatedByUser { get; set; }
 }

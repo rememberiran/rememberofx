@@ -1,4 +1,4 @@
-﻿using Application;
+using Application;
 using Microsoft.EntityFrameworkCore;
 using Storage;
 
@@ -19,7 +19,9 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<TweetMediaRecord> TweetMedia => Set<TweetMediaRecord>();
     public DbSet<AuditLogRecord> AuditLogs => Set<AuditLogRecord>();
     public DbSet<FolderClosureRecord> FolderClosures => Set<FolderClosureRecord>();
-    public DbSet<TrustedContributorRecord> TrustedContributors => Set<TrustedContributorRecord>();
+    public DbSet<FolderTweetRemovalRequestRecord> RemovalRequests => Set<FolderTweetRemovalRequestRecord>();
+    public DbSet<FolderTweetRemovalApprovalRecord> RemovalApprovals => Set<FolderTweetRemovalApprovalRecord>();
+    public DbSet<ViolationReportRecord> ViolationReports => Set<ViolationReportRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -30,6 +32,11 @@ public class AppDbContext : DbContext, IAppDbContext
             e.Property(u => u.XUserId).HasMaxLength(50);
             e.Property(u => u.XUsername).HasMaxLength(100);
             e.Property(u => u.Role).HasMaxLength(20);
+            e.Property(u => u.SuspendedReason).HasMaxLength(500);
+            e.HasOne(u => u.SuspendedByUser)
+             .WithMany()
+             .HasForeignKey(u => u.SuspendedByUserId)
+             .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<TweetRecord>(e =>
@@ -121,6 +128,8 @@ public class AppDbContext : DbContext, IAppDbContext
         {
             e.ToTable($"AuditLog");
             e.HasIndex(a => a.CorrelationId);
+            e.HasIndex(a => a.PerformedByUserId);
+            e.HasIndex(a => a.Action);
             e.Property(a => a.CorrelationId).HasMaxLength(36);
             e.Property(a => a.Action).HasMaxLength(100);
             e.Property(a => a.EntityType).HasMaxLength(50);
@@ -129,14 +138,62 @@ public class AppDbContext : DbContext, IAppDbContext
             e.Property(a => a.Region).HasMaxLength(100);
         });
 
-        modelBuilder.Entity<TrustedContributorRecord>(e =>
+        modelBuilder.Entity<FolderTweetRemovalRequestRecord>(e =>
         {
-            e.ToTable("TrustedContributors");
-            e.HasKey(tc => new { tc.OwnerUserId, tc.TrustedXUsername });
-            e.Property(tc => tc.TrustedXUsername).HasMaxLength(100);
-            e.HasOne(tc => tc.OwnerUser)
+            e.ToTable("RemovalRequests");
+            e.HasIndex(r => r.Status);
+            e.HasIndex(r => new { r.FolderId, r.TweetId });
+            e.Property(r => r.Status).HasMaxLength(10).HasDefaultValue("pending");
+            e.Property(r => r.RequestedByIp).HasMaxLength(50);
+            e.HasOne(r => r.Folder)
              .WithMany()
-             .HasForeignKey(tc => tc.OwnerUserId)
+             .HasForeignKey(r => r.FolderId)
+             .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(r => r.Tweet)
+             .WithMany()
+             .HasForeignKey(r => r.TweetId)
+             .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(r => r.RequestedByUser)
+             .WithMany()
+             .HasForeignKey(r => r.RequestedByUserId)
+             .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<FolderTweetRemovalApprovalRecord>(e =>
+        {
+            e.ToTable("RemovalApprovals");
+            e.HasIndex(a => a.RequestId);
+            e.HasIndex(a => new { a.RequestId, a.ApprovedByUserId }).IsUnique();
+            e.Property(a => a.IsVoid).HasDefaultValue(false);
+            e.HasOne(a => a.Request)
+             .WithMany(r => r.Approvals)
+             .HasForeignKey(a => a.RequestId)
+             .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(a => a.ApprovedByUser)
+             .WithMany()
+             .HasForeignKey(a => a.ApprovedByUserId)
+             .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ViolationReportRecord>(e =>
+        {
+            e.ToTable("ViolationReports");
+            e.HasIndex(v => v.ReportedUserId);
+            e.HasIndex(v => v.Status);
+            e.Property(v => v.Status).HasMaxLength(10).HasDefaultValue("pending");
+            e.Property(v => v.ReportedByIp).HasMaxLength(50);
+            e.Property(v => v.Explanation).HasMaxLength(2000);
+            e.HasOne(v => v.ReportedUser)
+             .WithMany()
+             .HasForeignKey(v => v.ReportedUserId)
+             .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(v => v.ReportedByUser)
+             .WithMany()
+             .HasForeignKey(v => v.ReportedByUserId)
+             .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(v => v.ReviewedByUser)
+             .WithMany()
+             .HasForeignKey(v => v.ReviewedByUserId)
              .OnDelete(DeleteBehavior.Restrict);
         });
     }

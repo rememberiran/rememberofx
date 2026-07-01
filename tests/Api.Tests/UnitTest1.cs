@@ -28,7 +28,9 @@ public class HealthEndpointTests
         public Microsoft.EntityFrameworkCore.DbSet<Storage.TweetMediaRecord> TweetMedia => throw new NotSupportedException();
         public Microsoft.EntityFrameworkCore.DbSet<Storage.AuditLogRecord> AuditLogs => throw new NotSupportedException();
         public Microsoft.EntityFrameworkCore.DbSet<Storage.FolderClosureRecord> FolderClosures => throw new NotSupportedException();
-        public Microsoft.EntityFrameworkCore.DbSet<Storage.TrustedContributorRecord> TrustedContributors => throw new NotSupportedException();
+        public Microsoft.EntityFrameworkCore.DbSet<Storage.FolderTweetRemovalRequestRecord> RemovalRequests => throw new NotSupportedException();
+        public Microsoft.EntityFrameworkCore.DbSet<Storage.FolderTweetRemovalApprovalRecord> RemovalApprovals => throw new NotSupportedException();
+        public Microsoft.EntityFrameworkCore.DbSet<Storage.ViolationReportRecord> ViolationReports => throw new NotSupportedException();
         public Microsoft.EntityFrameworkCore.Infrastructure.DatabaseFacade Database => throw new NotSupportedException();
         public Microsoft.EntityFrameworkCore.ChangeTracking.ChangeTracker ChangeTracker => throw new NotSupportedException();
         public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();

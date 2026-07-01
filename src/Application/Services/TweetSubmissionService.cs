@@ -12,7 +12,8 @@ namespace Application.Services;
 
 public partial class TweetSubmissionService : ITweetSubmissionService
 {
-    private const int RolelessUserHourlyLimit = 100;
+    private const int AuthenticatedUserDailyLimit = 500;
+    private const int AnonymousIpDailyLimit = 100;
     private const int IpDailyLimit = 1000;
 
     private static readonly EventId TweetSubmittedEvent = new(1050, "TweetSubmitted");
@@ -60,23 +61,31 @@ public partial class TweetSubmissionService : ITweetSubmissionService
         var ipDailyCutoff = now.AddDays(-1);
         var ipCount = await _db.Tweets.AsNoTracking()
             .CountAsync(t => t.SubmittedByIp == identity.IpAddress && t.CreatedAt >= ipDailyCutoff, ct);
+
+        if (identity.InternalUserId.HasValue)
+        {
+            var userDailyCutoff = now.AddDays(-1);
+            var userDailyCount = await _db.Tweets.AsNoTracking()
+                .CountAsync(t => t.SubmittedByUserId == identity.InternalUserId && t.CreatedAt >= userDailyCutoff, ct);
+            if (userDailyCount >= AuthenticatedUserDailyLimit)
+            {
+                _logger.LogWarning(UserRateLimitedEvent, "Daily limit reached for user {UserId} ({Count}/{Limit})", identity.InternalUserId, userDailyCount, AuthenticatedUserDailyLimit);
+                return Result.Failure<SubmissionResultWithQuota>(DomainError.TooManyRequests($"Daily submission limit of {AuthenticatedUserDailyLimit} reached"));
+            }
+        }
+        else
+        {
+            if (ipCount >= AnonymousIpDailyLimit)
+            {
+                _logger.LogWarning(IpRateLimitedEvent, "Anonymous IP daily limit reached for {IpAddress} ({Count}/{Limit})", identity.IpAddress, ipCount, AnonymousIpDailyLimit);
+                return Result.Failure<SubmissionResultWithQuota>(DomainError.TooManyRequests($"Daily submission limit of {AnonymousIpDailyLimit} per IP reached for anonymous users"));
+            }
+        }
+
         if (ipCount >= IpDailyLimit)
         {
             _logger.LogWarning(IpRateLimitedEvent, "IP daily limit reached for {IpAddress} ({Count}/{Limit})", identity.IpAddress, ipCount, IpDailyLimit);
             return Result.Failure<SubmissionResultWithQuota>(DomainError.TooManyRequests($"Daily submission limit of {IpDailyLimit} per IP reached"));
-        }
-
-        var hourlyApplies = identity.InternalUserId.HasValue && identity.Roles.Count == 0;
-        if (hourlyApplies)
-        {
-            var hourlyCutoff = now.AddHours(-1);
-            var userCount = await _db.Tweets.AsNoTracking()
-                .CountAsync(t => t.SubmittedByUserId == identity.InternalUserId && t.CreatedAt >= hourlyCutoff, ct);
-            if (userCount >= RolelessUserHourlyLimit)
-            {
-                _logger.LogWarning(UserRateLimitedEvent, "Hourly limit reached for user {UserId} ({Count}/{Limit})", identity.InternalUserId, userCount, RolelessUserHourlyLimit);
-                return Result.Failure<SubmissionResultWithQuota>(DomainError.TooManyRequests($"Hourly submission limit of {RolelessUserHourlyLimit} reached"));
-            }
         }
 
         var correlationId = Guid.NewGuid().ToString();
@@ -160,29 +169,33 @@ public partial class TweetSubmissionService : ITweetSubmissionService
 
     private async Task<SubmissionQuota> ComputeQuotaAsync(IdentityContext identity, DateTime now, CancellationToken ct)
     {
-        var hourlyResetAt = new DateTime(now.Year, now.Month, now.Day, now.Hour, 0, 0, DateTimeKind.Utc).AddHours(1);
         var dailyResetAt = new DateTime(now.Year, now.Month, now.Day, 0, 0, 0, DateTimeKind.Utc).AddDays(1);
+        var dailyCutoff = now.AddDays(-1);
 
-        var ipDailyCutoff = now.AddDays(-1);
-        var ipCount = await _db.Tweets.AsNoTracking()
-            .CountAsync(t => t.SubmittedByIp == identity.IpAddress && t.CreatedAt >= ipDailyCutoff, ct);
-        var dailyRemaining = Math.Max(0, IpDailyLimit - ipCount);
+        int dailyLimit;
+        int dailyCount;
 
-        var hourlyRemaining = RolelessUserHourlyLimit;
-        if (identity.InternalUserId.HasValue && identity.Roles.Count == 0)
+        if (identity.InternalUserId.HasValue)
         {
-            var hourlyCutoff = now.AddHours(-1);
-            var userCount = await _db.Tweets.AsNoTracking()
-                .CountAsync(t => t.SubmittedByUserId == identity.InternalUserId && t.CreatedAt >= hourlyCutoff, ct);
-            hourlyRemaining = Math.Max(0, RolelessUserHourlyLimit - userCount);
+            dailyLimit = AuthenticatedUserDailyLimit;
+            dailyCount = await _db.Tweets.AsNoTracking()
+                .CountAsync(t => t.SubmittedByUserId == identity.InternalUserId && t.CreatedAt >= dailyCutoff, ct);
+        }
+        else
+        {
+            dailyLimit = AnonymousIpDailyLimit;
+            dailyCount = await _db.Tweets.AsNoTracking()
+                .CountAsync(t => t.SubmittedByIp == identity.IpAddress && t.CreatedAt >= dailyCutoff, ct);
         }
 
+        var dailyRemaining = Math.Max(0, dailyLimit - dailyCount);
+
         return new SubmissionQuota(
-            hourlyRemaining,
-            RolelessUserHourlyLimit,
-            hourlyResetAt,
             dailyRemaining,
-            IpDailyLimit,
+            dailyLimit,
+            dailyResetAt,
+            dailyRemaining,
+            dailyLimit,
             dailyResetAt);
     }
 

@@ -37,6 +37,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IXUserProfileService, XUserProfileService>();
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IRemovalRequestService, RemovalRequestService>();
+        services.AddScoped<IViolationReportService, ViolationReportService>();
+        services.AddScoped<IPendingService, PendingService>();
 
         services.AddHttpClient<IXApiClient, XApiClient>();
 

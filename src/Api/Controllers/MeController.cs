@@ -1,6 +1,5 @@
-﻿using Api.Extensions;
+using Api.Extensions;
 using Api.Mappers;
-using Api.Models.Requests;
 using Api.Models.Responses;
 using Application;
 using Application.Interfaces;
@@ -101,78 +100,6 @@ public class MeController : ControllerBase
 
         var items = _tweetDtoMapper.ToDtoList(data.Items, votedIds);
         return Ok(new SearchTweetsResponse(items, data.TotalCount, null));
-    }
-
-    [HttpGet("trusted")]
-    [ProducesResponseType(typeof(List<TrustedContributorDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> GetTrustedContributors(CancellationToken ct)
-    {
-        var result = await _folderService.GetTrustedContributorsAsync(ct);
-        if (!result.IsSuccess)
-        {
-            return result.ToActionResult();
-        }
-
-        var dtos = result.Value!.Select(tc => new TrustedContributorDto(tc.TrustedXUsername, tc.CreatedAt)).ToList();
-        return Ok(dtos);
-    }
-
-    [HttpPost("trusted")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> AddTrustedContributor([FromBody] AddTrustedContributorRequest request, CancellationToken ct)
-    {
-        var result = await _folderService.AddTrustedContributorAsync(request.XUsername, ct);
-        return result.IsSuccess ? NoContent() : result.ToActionResult();
-    }
-
-    [HttpDelete("trusted/{xUsername}")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> RemoveTrustedContributor(string xUsername, CancellationToken ct)
-    {
-        var result = await _folderService.RemoveTrustedContributorAsync(xUsername, ct);
-        return result.IsSuccess ? NoContent() : result.ToActionResult();
-    }
-
-    [HttpGet("pending")]
-    [ProducesResponseType(typeof(List<PendingSubmissionDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> GetPendingSubmissions(CancellationToken ct)
-    {
-        var result = await _folderService.GetPendingSubmissionsAsync(ct);
-        if (!result.IsSuccess)
-        {
-            return result.ToActionResult();
-        }
-
-        var dtos = result.Value!.Select(ps => new PendingSubmissionDto(
-            _tweetDtoMapper.ToDto(ps.Tweet),
-            ps.RequestedFolders.Select(f => new PendingFolderDto(f.FolderId, f.FolderName, f.SubmittedAt)).ToList()))
-            .ToList();
-
-        return Ok(dtos);
-    }
-
-    [HttpPost("pending/{folderId:guid}/{tweetId:guid}/approve")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
-    public async Task<IActionResult> ApproveSubmission(Guid folderId, Guid tweetId, CancellationToken ct)
-    {
-        var result = await _folderService.ApproveSubmissionAsync(folderId, tweetId, ct);
-        return result.IsSuccess ? NoContent() : result.ToActionResult();
-    }
-
-    [HttpPost("pending/{folderId:guid}/{tweetId:guid}/reject")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status403Forbidden)]
-    public async Task<IActionResult> RejectSubmission(Guid folderId, Guid tweetId, CancellationToken ct)
-    {
-        var result = await _folderService.RejectSubmissionAsync(folderId, tweetId, ct);
-        return result.IsSuccess ? NoContent() : result.ToActionResult();
     }
 
     [HttpGet("contribution-stats")]

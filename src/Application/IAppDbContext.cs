@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Storage;
@@ -16,7 +16,9 @@ public interface IAppDbContext
     DbSet<TweetMediaRecord> TweetMedia { get; }
     DbSet<AuditLogRecord> AuditLogs { get; }
     DbSet<FolderClosureRecord> FolderClosures { get; }
-    DbSet<TrustedContributorRecord> TrustedContributors { get; }
+    DbSet<FolderTweetRemovalRequestRecord> RemovalRequests { get; }
+    DbSet<FolderTweetRemovalApprovalRecord> RemovalApprovals { get; }
+    DbSet<ViolationReportRecord> ViolationReports { get; }
     DatabaseFacade Database { get; }
     ChangeTracker ChangeTracker { get; }
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);

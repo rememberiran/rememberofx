@@ -69,6 +69,8 @@ namespace Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("Action");
+
                     b.HasIndex("CorrelationId");
 
                     b.HasIndex("PerformedByUserId");
@@ -174,21 +176,82 @@ namespace Infrastructure.Migrations
                     b.ToTable("FolderTweets", (string)null);
                 });
 
-            modelBuilder.Entity("Storage.TrustedContributorRecord", b =>
+            modelBuilder.Entity("Storage.FolderTweetRemovalApprovalRecord", b =>
                 {
-                    b.Property<Guid>("OwnerUserId")
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<string>("TrustedXUsername")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<DateTime>("CreatedAt")
+                    b.Property<DateTime>("ApprovedAt")
                         .HasColumnType("datetime2");
 
-                    b.HasKey("OwnerUserId", "TrustedXUsername");
+                    b.Property<Guid>("ApprovedByUserId")
+                        .HasColumnType("uniqueidentifier");
 
-                    b.ToTable("TrustedContributors", (string)null);
+                    b.Property<bool>("IsVoid")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApprovedByUserId");
+
+                    b.HasIndex("RequestId");
+
+                    b.HasIndex("RequestId", "ApprovedByUserId")
+                        .IsUnique();
+
+                    b.ToTable("RemovalApprovals", (string)null);
+                });
+
+            modelBuilder.Entity("Storage.FolderTweetRemovalRequestRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("FolderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("RequestedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("RequestedByIp")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<Guid?>("RequestedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("ResolvedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)")
+                        .HasDefaultValue("pending");
+
+                    b.Property<Guid>("TweetId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RequestedByUserId");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("TweetId");
+
+                    b.HasIndex("FolderId", "TweetId");
+
+                    b.ToTable("RemovalRequests", (string)null);
                 });
 
             modelBuilder.Entity("Storage.TweetMediaRecord", b =>
@@ -336,6 +399,16 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
+                    b.Property<DateTime?>("SuspendedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("SuspendedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("SuspendedReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<string>("XUserId")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -350,10 +423,63 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("CreatedByUserId");
 
+                    b.HasIndex("SuspendedByUserId");
+
                     b.HasIndex("XUserId")
                         .IsUnique();
 
                     b.ToTable("Users", (string)null);
+                });
+
+            modelBuilder.Entity("Storage.ViolationReportRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Explanation")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("ReportedByIp")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<Guid?>("ReportedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ReportedUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("ReviewedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("ReviewedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)")
+                        .HasDefaultValue("pending");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReportedByUserId");
+
+                    b.HasIndex("ReportedUserId");
+
+                    b.HasIndex("ReviewedByUserId");
+
+                    b.HasIndex("Status");
+
+                    b.ToTable("ViolationReports", (string)null);
                 });
 
             modelBuilder.Entity("Storage.VoteRecord", b =>
@@ -506,15 +632,49 @@ namespace Infrastructure.Migrations
                     b.Navigation("Tweet");
                 });
 
-            modelBuilder.Entity("Storage.TrustedContributorRecord", b =>
+            modelBuilder.Entity("Storage.FolderTweetRemovalApprovalRecord", b =>
                 {
-                    b.HasOne("Storage.UserRecord", "OwnerUser")
+                    b.HasOne("Storage.UserRecord", "ApprovedByUser")
                         .WithMany()
-                        .HasForeignKey("OwnerUserId")
+                        .HasForeignKey("ApprovedByUserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.Navigation("OwnerUser");
+                    b.HasOne("Storage.FolderTweetRemovalRequestRecord", "Request")
+                        .WithMany("Approvals")
+                        .HasForeignKey("RequestId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ApprovedByUser");
+
+                    b.Navigation("Request");
+                });
+
+            modelBuilder.Entity("Storage.FolderTweetRemovalRequestRecord", b =>
+                {
+                    b.HasOne("Storage.FolderRecord", "Folder")
+                        .WithMany()
+                        .HasForeignKey("FolderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Storage.UserRecord", "RequestedByUser")
+                        .WithMany()
+                        .HasForeignKey("RequestedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Storage.TweetRecord", "Tweet")
+                        .WithMany()
+                        .HasForeignKey("TweetId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Folder");
+
+                    b.Navigation("RequestedByUser");
+
+                    b.Navigation("Tweet");
                 });
 
             modelBuilder.Entity("Storage.TweetMediaRecord", b =>
@@ -543,7 +703,39 @@ namespace Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("CreatedByUserId");
 
+                    b.HasOne("Storage.UserRecord", "SuspendedByUser")
+                        .WithMany()
+                        .HasForeignKey("SuspendedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("CreatedByUser");
+
+                    b.Navigation("SuspendedByUser");
+                });
+
+            modelBuilder.Entity("Storage.ViolationReportRecord", b =>
+                {
+                    b.HasOne("Storage.UserRecord", "ReportedByUser")
+                        .WithMany()
+                        .HasForeignKey("ReportedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Storage.UserRecord", "ReportedUser")
+                        .WithMany()
+                        .HasForeignKey("ReportedUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Storage.UserRecord", "ReviewedByUser")
+                        .WithMany()
+                        .HasForeignKey("ReviewedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("ReportedByUser");
+
+                    b.Navigation("ReportedUser");
+
+                    b.Navigation("ReviewedByUser");
                 });
 
             modelBuilder.Entity("Storage.VoteRecord", b =>
@@ -583,6 +775,11 @@ namespace Infrastructure.Migrations
                     b.Navigation("Children");
 
                     b.Navigation("FolderTweets");
+                });
+
+            modelBuilder.Entity("Storage.FolderTweetRemovalRequestRecord", b =>
+                {
+                    b.Navigation("Approvals");
                 });
 
             modelBuilder.Entity("Storage.TweetRecord", b =>

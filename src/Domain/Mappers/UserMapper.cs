@@ -16,6 +16,9 @@ public static class UserMapper
             IsActive = record.IsActive,
             CreatedAt = record.CreatedAt,
             CreatedByUserId = record.CreatedByUserId,
+            SuspendedAt = record.SuspendedAt,
+            SuspendedReason = record.SuspendedReason,
+            SuspendedByUserId = record.SuspendedByUserId,
             CreatedByUser = record.CreatedByUser is not null ? ToDomain(record.CreatedByUser) : null,
         };
     }
@@ -31,6 +34,9 @@ public static class UserMapper
             IsActive = entity.IsActive,
             CreatedAt = entity.CreatedAt,
             CreatedByUserId = entity.CreatedByUserId,
+            SuspendedAt = entity.SuspendedAt,
+            SuspendedReason = entity.SuspendedReason,
+            SuspendedByUserId = entity.SuspendedByUserId,
         };
     }
 }

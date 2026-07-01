@@ -13,6 +13,8 @@ public static class UserDtoMapper
             user.XUsername,
             user.Role,
             user.IsActive,
-            user.CreatedAt);
+            user.CreatedAt,
+            IsSuspended: user.SuspendedAt.HasValue,
+            SuspendedReason: user.SuspendedAt.HasValue ? user.SuspendedReason : null);
     }
 }

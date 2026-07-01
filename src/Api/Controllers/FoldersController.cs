@@ -243,7 +243,7 @@ public class FoldersController : ControllerBase
     }
 
     [HttpPost("{folderId:guid}/tweets/{tweetId:guid}")]
-    [Authorize(Roles = "Contributor,Admin")]
+    [Authorize]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status409Conflict)]
@@ -254,13 +254,12 @@ public class FoldersController : ControllerBase
     }
 
     [HttpDelete("{folderId:guid}/tweets/{tweetId:guid}")]
-    [Authorize(Roles = "Contributor,Admin")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> RemoveTweet(Guid folderId, Guid tweetId, CancellationToken ct)
+    [ProducesResponseType(StatusCodes.Status405MethodNotAllowed)]
+    public IActionResult RemoveTweet(Guid folderId, Guid tweetId)
     {
-        var result = await _folderService.RemoveTweetAsync(folderId, tweetId, ct);
-        return result.IsSuccess ? NoContent() : result.ToActionResult();
+        return StatusCode(
+            StatusCodes.Status405MethodNotAllowed,
+            new ErrorResponse("MethodNotAllowed", "Direct removal is not allowed. Submit a removal request instead."));
     }
 
     [HttpGet("{id:guid}/contribution-stats")]

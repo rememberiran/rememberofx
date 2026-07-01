@@ -13,6 +13,8 @@ public class UserService : IUserService
     private static readonly EventId UserAddedEvent = new(1010, "UserAdded");
     private static readonly EventId UserUpdatedEvent = new(1011, "UserUpdated");
     private static readonly EventId UserDeactivatedEvent = new(1012, "UserDeactivated");
+    private static readonly EventId UserSuspendedEvent = new(1013, "UserSuspended");
+    private static readonly EventId UserUnsuspendedEvent = new(1014, "UserUnsuspended");
 
     private readonly ILogger<UserService> _logger;
 
@@ -27,6 +29,17 @@ public class UserService : IUserService
         var records = await _db.Users.AsNoTracking().ToListAsync(ct);
         var users = records.Select(r => UserMapper.ToDomain(r)).ToList();
         return Result.Success(users);
+    }
+
+    public async Task<Result<User>> GetByIdAsync(Guid id, CancellationToken ct)
+    {
+        var user = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == id, ct);
+        if (user is null)
+        {
+            return Result.Failure<User>(DomainError.NotFound("User not found"));
+        }
+
+        return Result.Success(UserMapper.ToDomain(user));
     }
 
     public async Task<Result<User>> GetByXUserIdAsync(string xUserId, CancellationToken ct)
@@ -107,5 +120,53 @@ public class UserService : IUserService
         _logger.LogInformation(UserDeactivatedEvent, "User deactivated: {UserId}", id);
 
         return Result.Success();
+    }
+
+    public async Task<Result<User>> SuspendAsync(Guid id, string reason, Guid suspendedByUserId, CancellationToken ct)
+    {
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == id, ct);
+        if (user is null)
+        {
+            return Result.Failure<User>(DomainError.NotFound("User not found"));
+        }
+
+        if (user.SuspendedAt.HasValue)
+        {
+            return Result.Failure<User>(DomainError.Conflict("User is already suspended"));
+        }
+
+        user.SuspendedAt = DateTime.UtcNow;
+        user.SuspendedReason = reason;
+        user.SuspendedByUserId = suspendedByUserId;
+
+        await _db.RemovalApprovals
+            .Where(a => a.ApprovedByUserId == id && a.IsVoid == false)
+            .ExecuteUpdateAsync(s => s.SetProperty(a => a.IsVoid, true), ct);
+
+        _logger.LogInformation(UserSuspendedEvent, "User suspended: {UserId} by {SuspendedByUserId}, reason: {Reason}", id, suspendedByUserId, reason);
+
+        return Result.Success(UserMapper.ToDomain(user));
+    }
+
+    public async Task<Result<User>> UnsuspendAsync(Guid id, CancellationToken ct)
+    {
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == id, ct);
+        if (user is null)
+        {
+            return Result.Failure<User>(DomainError.NotFound("User not found"));
+        }
+
+        if (!user.SuspendedAt.HasValue)
+        {
+            return Result.Failure<User>(DomainError.Conflict("User is not suspended"));
+        }
+
+        user.SuspendedAt = null;
+        user.SuspendedReason = null;
+        user.SuspendedByUserId = null;
+
+        _logger.LogInformation(UserUnsuspendedEvent, "User unsuspended: {UserId}", id);
+
+        return Result.Success(UserMapper.ToDomain(user));
     }
 }

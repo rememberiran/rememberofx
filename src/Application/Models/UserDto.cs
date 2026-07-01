@@ -1,4 +1,4 @@
-﻿namespace Application.Models;
+namespace Application.Models;
 
 public record UserDto(
     Guid Id,
@@ -6,4 +6,6 @@ public record UserDto(
     string XUsername,
     string? Role,
     bool IsActive,
-    DateTime CreatedAt);
+    DateTime CreatedAt,
+    bool IsSuspended,
+    string? SuspendedReason);
